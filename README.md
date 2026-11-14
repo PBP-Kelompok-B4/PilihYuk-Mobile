@@ -1,1 +1,0 @@
-# PilihYuk-Mobile

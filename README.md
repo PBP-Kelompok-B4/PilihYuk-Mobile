@@ -6,7 +6,7 @@ Proyek Akhir Semester, Pemrograman Berbasis Platform (CSGE602022), Fakultas Ilmu
 
 - Situs web (PWS): https://ahmad-rizki53-pilihyuk.pws.cs.ui.ac.id/
 - Repositori situs web: https://github.com/PBP-Kelompok-B4/PilihYuk
-- Desain Figma: menyusul
+- Desain Figma: https://www.figma.com/design/6CwhelVNc1lJ9XWB4OnYlc/Wireframe?m=auto&t=CVl65mv1cAQ71x4E-6
 - APK: menyusul
 
 ## Anggota Kelompok

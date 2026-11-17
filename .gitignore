@@ -46,3 +46,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Private notes and assignment PDF
+CLAUDE.local.md
+.private/
+*.pdf

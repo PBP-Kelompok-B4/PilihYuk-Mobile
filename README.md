@@ -53,7 +53,7 @@ Semua data tetap tersimpan di situs web Django di PWS. Aplikasi ini tidak menyim
 1. Setiap modul di situs web punya `serializers.py`, `api_views.py` dan `api_urls.py` (Django REST Framework). Semua endpoint ada di bawah `/api/v1/`.
 2. Aplikasi memakai `CookieRequest` dari paket [`pbp_django_auth`](https://pub.dev/packages/pbp_django_auth), yang dibagikan ke semua halaman lewat `Provider`.
 3. Saat masuk, aplikasi mengirim email dan password ke `/api/v1/auth/login/`. Django memeriksa akun dengan form yang sama dengan situs web (termasuk batas percobaan gagal), lalu membuat sesi. `CookieRequest` menyimpan cookie sesi dan mengirimkannya di setiap permintaan berikutnya.
-4. Halaman modul memanggil endpoint secara asinkron (`request.get` dan `request.post`), mengubah JSON balasan menjadi model Dart, lalu menampilkannya.
+4. Halaman modul memanggil endpoint secara asinkron: membaca dengan `request.get`, dan menulis (POST, PUT, PATCH, DELETE) dengan `sendJson` dari `lib/api.dart`, yang menambahkan token CSRF dari cookie login. JSON balasan diubah menjadi model Dart, lalu ditampilkan.
 5. Perubahan dari aplikasi langsung tersimpan di basis data PWS, jadi situs web dan aplikasi selalu menampilkan data yang sama.
 
 ## Menjalankan Aplikasi

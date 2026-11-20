@@ -9,7 +9,27 @@ class PreferencesPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Preferensi')),
       drawer: const LeftDrawer(),
-      body: const Center(child: Text('Halaman Preferensi (Jonathan)')),
+      body: Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Nutrien yang dibandingkan'),
+            SizedBox(height: 50),
+            Text('Protein'),
+            SizedBox(height: 10),
+            Text('Serat'),
+            SizedBox(height: 10),
+            Text('Gula'),
+            SizedBox(height: 10),
+            Text('Natrium'),
+            SizedBox(height: 10),
+            Text('Lemak Jenuh'),
+            SizedBox(height: 10),
+            Text('Kalori'),
+          ],
+        ),
+      ),
     );
   }
 }

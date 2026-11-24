@@ -23,7 +23,12 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
 
   Future<CorrectionQueue> _fetch() async {
     final request = context.read<CookieRequest>();
-    final url = CorrectionQueue.uri(baseUrl, sort: _sort, missing: _missing, page: _page);
+    final url = CorrectionQueue.uri(
+      baseUrl,
+      sort: _sort,
+      missing: _missing,
+      page: _page,
+    );
     final data = await request.get(url.toString());
     return CorrectionQueue.fromJson(data);
   }
@@ -68,7 +73,9 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return _message('Gagal memuat antrean. Tarik ke bawah untuk mencoba lagi.');
+              return _message(
+                'Gagal memuat antrean. Tarik ke bawah untuk mencoba lagi.',
+              );
             }
             return _queueView(snapshot.data!, loading);
           },
@@ -89,7 +96,10 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
           style: textTheme.bodyMedium,
         ),
         const SizedBox(height: 16),
-        QueueStatsGrid(stats: queue.stats, shelfAvailable: queue.shelfAvailable),
+        QueueStatsGrid(
+          stats: queue.stats,
+          shelfAvailable: queue.shelfAvailable,
+        ),
         const SizedBox(height: 8),
         Text('Urutkan', style: textTheme.labelLarge),
         const SizedBox(height: 4),
@@ -101,7 +111,8 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
               ChoiceChip(
                 label: Text(option.label),
                 selected: option.key == queue.sort,
-                onSelected: (_) => _show(sort: option.key, missing: queue.missing),
+                onSelected: (_) =>
+                    _show(sort: option.key, missing: queue.missing),
               ),
           ],
         ),
@@ -126,7 +137,10 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
           ],
         ),
         const SizedBox(height: 12),
-        Text('${formatThousands(queue.count)} produk', style: textTheme.bodySmall),
+        Text(
+          '${formatThousands(queue.count)} produk',
+          style: textTheme.bodySmall,
+        ),
         const SizedBox(height: 8),
         if (queue.results.isEmpty)
           Padding(
@@ -139,7 +153,8 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
             ),
           )
         else ...[
-          for (final product in queue.results) QueueProductCard(product: product, onContribute: _comingSoon),
+          for (final product in queue.results)
+            QueueProductCard(product: product, onContribute: _comingSoon),
           _pagination(queue),
         ],
       ],
@@ -151,19 +166,32 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
     final next = queue.nextPage;
     return Column(
       children: [
-        Text('Halaman ${queue.page} dari ${queue.numPages}', textAlign: TextAlign.center),
+        Text(
+          'Halaman ${queue.page} dari ${queue.numPages}',
+          textAlign: TextAlign.center,
+        ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             TextButton.icon(
               onPressed: previous == null
                   ? null
-                  : () => _show(sort: queue.sort, missing: queue.missing, page: previous),
+                  : () => _show(
+                      sort: queue.sort,
+                      missing: queue.missing,
+                      page: previous,
+                    ),
               icon: const Icon(Icons.chevron_left),
               label: const Text('Sebelumnya'),
             ),
             TextButton(
-              onPressed: next == null ? null : () => _show(sort: queue.sort, missing: queue.missing, page: next),
+              onPressed: next == null
+                  ? null
+                  : () => _show(
+                      sort: queue.sort,
+                      missing: queue.missing,
+                      page: next,
+                    ),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [Text('Berikutnya'), Icon(Icons.chevron_right)],
@@ -177,7 +205,12 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
 
   // ListView, supaya tarik-untuk-muat-ulang tetap bisa saat galat.
   Widget _message(String text) => ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [Padding(padding: const EdgeInsets.all(32), child: Text(text, textAlign: TextAlign.center))],
-      );
+    physics: const AlwaysScrollableScrollPhysics(),
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(32),
+        child: Text(text, textAlign: TextAlign.center),
+      ),
+    ],
+  );
 }

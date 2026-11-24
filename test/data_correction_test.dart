@@ -70,16 +70,21 @@ Map<String, dynamic> sampleWithoutImages() {
   return json;
 }
 
-Future<FakeRequest> pumpPage(WidgetTester tester, Object? Function() reply) async {
+Future<FakeRequest> pumpPage(
+  WidgetTester tester,
+  Object? Function() reply,
+) async {
   // Layar tinggi, supaya semua kartu dan tombol halaman langsung dibangun ListView.
   tester.view.physicalSize = const Size(1000, 6000);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   final request = FakeRequest(reply);
-  await tester.pumpWidget(Provider<CookieRequest>.value(
-    value: request,
-    child: const MaterialApp(home: DataCorrectionPage()),
-  ));
+  await tester.pumpWidget(
+    Provider<CookieRequest>.value(
+      value: request,
+      child: const MaterialApp(home: DataCorrectionPage()),
+    ),
+  );
   await tester.pump();
   await tester.pump();
   return request;
@@ -89,23 +94,59 @@ void main() {
   group('CorrectionQueue.fromJson', () {
     test('reads a full response', () {
       final queue = CorrectionQueue.fromJson(sample());
-      expect([queue.count, queue.page, queue.pageSize, queue.numPages, queue.nextPage, queue.previousPage],
-          [347, 1, 20, 18, 2, null]);
-      expect([queue.sort, queue.missing, queue.shelfAvailable], ['shelf', null, true]);
-      expect([for (final option in queue.sortOptions) option.key], ['shelf', 'kosong', 'terbaru']);
-      expect([for (final option in queue.missingOptions) option.label],
-          ['Gizi', 'NOVA', 'Merek', 'Isi bersih', 'Asal']);
-      expect([queue.stats.incompleteProducts, queue.stats.submittedLast7Days, queue.stats.approved],
-          [347, 0, 5]);
+      expect(
+        [
+          queue.count,
+          queue.page,
+          queue.pageSize,
+          queue.numPages,
+          queue.nextPage,
+          queue.previousPage,
+        ],
+        [347, 1, 20, 18, 2, null],
+      );
+      expect(
+        [queue.sort, queue.missing, queue.shelfAvailable],
+        ['shelf', null, true],
+      );
+      expect(
+        [for (final option in queue.sortOptions) option.key],
+        ['shelf', 'kosong', 'terbaru'],
+      );
+      expect(
+        [for (final option in queue.missingOptions) option.label],
+        ['Gizi', 'NOVA', 'Merek', 'Isi bersih', 'Asal'],
+      );
+      expect(
+        [
+          queue.stats.incompleteProducts,
+          queue.stats.submittedLast7Days,
+          queue.stats.approved,
+        ],
+        [347, 0, 5],
+      );
       expect(queue.stats.shelfAverage, 0.1);
 
       final first = queue.results.first;
-      expect([first.id, first.productName, first.brand, first.quantity, first.subtitle],
-          [107, 'BLUE BAND CAKE & COOKIE', '', '', '']);
+      expect(
+        [
+          first.id,
+          first.productName,
+          first.brand,
+          first.quantity,
+          first.subtitle,
+        ],
+        [107, 'BLUE BAND CAKE & COOKIE', '', '', ''],
+      );
       expect(first.imageUrl, startsWith('https://images.openfoodfacts.org/'));
-      expect([first.missingCount, first.shelfCount, first.status, first.statusLabel],
-          [11, 5, 'needs_verification', 'Perlu verifikasi']);
-      expect([for (final entry in first.missing) entry.key], ['nutrition', 'nova', 'brand', 'quantity', 'origin']);
+      expect(
+        [first.missingCount, first.shelfCount, first.status, first.statusLabel],
+        [11, 5, 'needs_verification', 'Perlu verifikasi'],
+      );
+      expect(
+        [for (final entry in first.missing) entry.key],
+        ['nutrition', 'nova', 'brand', 'quantity', 'origin'],
+      );
       expect(first.missing.first.correctable, isTrue);
       expect(first.missing.first.fields, hasLength(7));
       expect(first.missing[1].fields, ['nova_group']);
@@ -125,15 +166,34 @@ void main() {
       row['brand'] = 'Blue Band';
       row['quantity'] = '200 g';
       row['missing'] = [
-        {'key': 'packaging', 'label': 'Kemasan', 'correctable': false, 'fields': <String>[]},
+        {
+          'key': 'packaging',
+          'label': 'Kemasan',
+          'correctable': false,
+          'fields': <String>[],
+        },
       ];
 
       final queue = CorrectionQueue.fromJson(json);
-      expect([queue.missing, queue.nextPage, queue.previousPage, queue.shelfAvailable], ['nova', null, 17, false]);
+      expect(
+        [
+          queue.missing,
+          queue.nextPage,
+          queue.previousPage,
+          queue.shelfAvailable,
+        ],
+        ['nova', null, 17, false],
+      );
       expect(queue.stats.shelfAverage, isNull);
       final first = queue.results.first;
-      expect([first.shelfCount, first.imageUrl, first.subtitle], [null, '', 'Blue Band · 200 g']);
-      expect([first.missing.single.correctable, first.missing.single.fields], [false, isEmpty]);
+      expect(
+        [first.shelfCount, first.imageUrl, first.subtitle],
+        [null, '', 'Blue Band · 200 g'],
+      );
+      expect(
+        [first.missing.single.correctable, first.missing.single.fields],
+        [false, isEmpty],
+      );
     });
 
     test('shelf_average 0 from an empty queue is a double', () {
@@ -145,17 +205,39 @@ void main() {
 
   test('CorrectionQueue.uri leaves out null values and page 1', () {
     const base = 'http://127.0.0.1:8000';
-    expect(CorrectionQueue.uri(base).toString(), '$base/api/v1/corrections/queue/');
-    expect(CorrectionQueue.uri(base, sort: 'terbaru', missing: 'nova', page: 2).toString(),
-        '$base/api/v1/corrections/queue/?sort=terbaru&missing=nova&page=2');
-    expect(CorrectionQueue.uri(base, sort: 'kosong', page: 1).toString(),
-        '$base/api/v1/corrections/queue/?sort=kosong');
+    expect(
+      CorrectionQueue.uri(base).toString(),
+      '$base/api/v1/corrections/queue/',
+    );
+    expect(
+      CorrectionQueue.uri(
+        base,
+        sort: 'terbaru',
+        missing: 'nova',
+        page: 2,
+      ).toString(),
+      '$base/api/v1/corrections/queue/?sort=terbaru&missing=nova&page=2',
+    );
+    expect(
+      CorrectionQueue.uri(base, sort: 'kosong', page: 1).toString(),
+      '$base/api/v1/corrections/queue/?sort=kosong',
+    );
   });
 
   test('number formats follow the website', () {
-    expect([formatThousands(0), formatThousands(347), formatThousands(1248), formatThousands(1234567)],
-        ['0', '347', '1.248', '1.234.567']);
-    expect([formatTimes(0.1), formatTimes(9.0), formatTimes(0), formatTimes(null)], ['0,1×', '9×', '0×', '—']);
+    expect(
+      [
+        formatThousands(0),
+        formatThousands(347),
+        formatThousands(1248),
+        formatThousands(1234567),
+      ],
+      ['0', '347', '1.248', '1.234.567'],
+    );
+    expect(
+      [formatTimes(0.1), formatTimes(9.0), formatTimes(0), formatTimes(null)],
+      ['0,1×', '9×', '0×', '—'],
+    );
   });
 
   group('DataCorrectionPage', () {
@@ -164,12 +246,20 @@ void main() {
 
       expect(request.urls, ['$baseUrl/api/v1/corrections/queue/']);
       expect(find.widgetWithText(AppBar, 'Antrean Data'), findsOneWidget);
-      for (final label in ['Menunggu kontribusi', 'Diajukan minggu ini', 'Disetujui', 'Rata-rata di shelf']) {
+      for (final label in [
+        'Menunggu kontribusi',
+        'Diajukan minggu ini',
+        'Disetujui',
+        'Rata-rata di shelf',
+      ]) {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.text('347'), findsOneWidget);
       expect(find.text('0,1×'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Paling sering di shelf'), findsOneWidget);
+      expect(
+        find.widgetWithText(ChoiceChip, 'Paling sering di shelf'),
+        findsOneWidget,
+      );
       expect(find.widgetWithText(ChoiceChip, 'Semua'), findsOneWidget);
       expect(find.text('BLUE BAND CAKE & COOKIE'), findsOneWidget);
       expect(find.text('Ada di 5 shelf'), findsNWidgets(2));
@@ -180,23 +270,35 @@ void main() {
       await tester.tap(find.widgetWithText(ChoiceChip, 'NOVA'));
       await tester.pump();
       await tester.pump();
-      expect(request.urls.last, '$baseUrl/api/v1/corrections/queue/?sort=shelf&missing=nova');
+      expect(
+        request.urls.last,
+        '$baseUrl/api/v1/corrections/queue/?sort=shelf&missing=nova',
+      );
 
       await tester.tap(find.text('Berikutnya'));
       await tester.pump();
       await tester.pump();
-      expect(request.urls.last, '$baseUrl/api/v1/corrections/queue/?sort=shelf&page=2');
+      expect(
+        request.urls.last,
+        '$baseUrl/api/v1/corrections/queue/?sort=shelf&page=2',
+      );
 
       await tester.tap(find.text('Lengkapi Data').first);
       await tester.pump();
       expect(find.text('Segera hadir'), findsOneWidget);
-      expect(request.urls, hasLength(3)); // tombol ajukan belum memanggil endpoint
+      expect(
+        request.urls,
+        hasLength(3),
+      ); // tombol ajukan belum memanggil endpoint
     });
 
     testWidgets('shows the error message when loading fails', (tester) async {
       await pumpPage(tester, () => throw const FormatException('400'));
       expect(find.widgetWithText(AppBar, 'Antrean Data'), findsOneWidget);
-      expect(find.text('Gagal memuat antrean. Tarik ke bawah untuk mencoba lagi.'), findsOneWidget);
+      expect(
+        find.text('Gagal memuat antrean. Tarik ke bawah untuk mencoba lagi.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('shows the empty state without a filter', (tester) async {
@@ -207,8 +309,14 @@ void main() {
 
     testWidgets('shows the empty state for a filter', (tester) async {
       await pumpPage(tester, () => emptySample('nova'));
-      expect(find.text('Tidak ada produk yang kekurangan data jenis ini.'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Semua'), findsOneWidget); // filter masih bisa dihapus
+      expect(
+        find.text('Tidak ada produk yang kekurangan data jenis ini.'),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(ChoiceChip, 'Semua'),
+        findsOneWidget,
+      ); // filter masih bisa dihapus
     });
   });
 }

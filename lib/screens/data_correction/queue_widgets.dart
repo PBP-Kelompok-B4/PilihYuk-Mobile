@@ -13,7 +13,11 @@ const _missingText = Color(0xFF6B4D00);
 
 /// Empat kartu statistik, label sama dengan /antrean/ di situs web.
 class QueueStatsGrid extends StatelessWidget {
-  const QueueStatsGrid({super.key, required this.stats, required this.shelfAvailable});
+  const QueueStatsGrid({
+    super.key,
+    required this.stats,
+    required this.shelfAvailable,
+  });
 
   final QueueStats stats;
   final bool shelfAvailable;
@@ -51,7 +55,9 @@ class QueueStatsGrid extends StatelessWidget {
         foreground: _brand,
         value: shelfAvailable ? formatTimes(stats.shelfAverage) : '—',
         title: 'Rata-rata di shelf',
-        caption: shelfAvailable ? 'kemunculan per produk' : 'data shelf belum tersedia',
+        caption: shelfAvailable
+            ? 'kemunculan per produk'
+            : 'data shelf belum tersedia',
       ),
     ];
     return Column(
@@ -108,7 +114,12 @@ class _StatCard extends StatelessWidget {
               child: Icon(icon, size: 18, color: foreground),
             ),
             const SizedBox(height: 8),
-            Text(value, style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              value,
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             Text(title, style: textTheme.labelLarge),
             Text(caption, style: textTheme.bodySmall),
           ],
@@ -120,7 +131,11 @@ class _StatCard extends StatelessWidget {
 
 /// Satu produk di antrean: gambar, nama, merek · isi, data yang kurang, shelf, dan status.
 class QueueProductCard extends StatelessWidget {
-  const QueueProductCard({super.key, required this.product, required this.onContribute});
+  const QueueProductCard({
+    super.key,
+    required this.product,
+    required this.onContribute,
+  });
 
   final QueueProduct product;
   final VoidCallback onContribute;
@@ -145,10 +160,13 @@ class QueueProductCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        product.productName.trim().isEmpty ? 'Produk tanpa nama' : product.productName,
+                        product.productName.trim().isEmpty
+                            ? 'Produk tanpa nama'
+                            : product.productName,
                         style: textTheme.titleMedium,
                       ),
-                      if (product.subtitle.isNotEmpty) Text(product.subtitle, style: textTheme.bodySmall),
+                      if (product.subtitle.isNotEmpty)
+                        Text(product.subtitle, style: textTheme.bodySmall),
                     ],
                   ),
                 ),
@@ -160,7 +178,10 @@ class QueueProductCard extends StatelessWidget {
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: [for (final entry in product.missing) _MissingChip(label: entry.label)],
+              children: [
+                for (final entry in product.missing)
+                  _MissingChip(label: entry.label),
+              ],
             ),
             const SizedBox(height: 12),
             Wrap(
@@ -168,9 +189,15 @@ class QueueProductCard extends StatelessWidget {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                QueueStatusChip(status: product.status, label: product.statusLabel),
+                QueueStatusChip(
+                  status: product.status,
+                  label: product.statusLabel,
+                ),
                 if (product.shelfCount != null)
-                  Text('Ada di ${formatThousands(product.shelfCount!)} shelf', style: textTheme.bodySmall),
+                  Text(
+                    'Ada di ${formatThousands(product.shelfCount!)} shelf',
+                    style: textTheme.bodySmall,
+                  ),
               ],
             ),
             Align(
@@ -205,7 +232,11 @@ class _ProductImage extends StatelessWidget {
         alignment: Alignment.center,
         child: url.isEmpty
             ? placeholder
-            : Image.network(url, fit: BoxFit.contain, errorBuilder: (_, _, _) => placeholder),
+            : Image.network(
+                url,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => placeholder,
+              ),
       ),
     );
   }
@@ -220,13 +251,23 @@ class _MissingChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: _missingBackground, borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(
+        color: _missingBackground,
+        borderRadius: BorderRadius.circular(999),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.warning_amber_rounded, size: 14, color: _missingText),
+          const Icon(
+            Icons.warning_amber_rounded,
+            size: 14,
+            color: _missingText,
+          ),
           const SizedBox(width: 4),
-          Text(label, style: const TextStyle(color: _missingText, fontSize: 12)),
+          Text(
+            label,
+            style: const TextStyle(color: _missingText, fontSize: 12),
+          ),
         ],
       ),
     );

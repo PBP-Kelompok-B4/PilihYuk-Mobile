@@ -7,10 +7,10 @@ class MissingData {
   final List<String> fields;
 
   MissingData.fromJson(Map<String, dynamic> json)
-      : key = json['key'],
-        label = json['label'],
-        correctable = json['correctable'],
-        fields = [for (final field in json['fields']) field as String];
+    : key = json['key'],
+      label = json['label'],
+      correctable = json['correctable'],
+      fields = [for (final field in json['fields']) field as String];
 }
 
 /// Satu produk di antrean.
@@ -29,19 +29,22 @@ class QueueProduct {
   final String statusLabel;
 
   QueueProduct.fromJson(Map<String, dynamic> json)
-      : id = json['id'],
-        productName = json['product_name'],
-        brand = json['brand'],
-        quantity = json['quantity'],
-        imageUrl = json['image_url'] ?? '',
-        missing = [for (final entry in json['missing']) MissingData.fromJson(entry)],
-        missingCount = json['missing_count'],
-        shelfCount = json['shelf_count'],
-        status = json['status'],
-        statusLabel = json['status_label'];
+    : id = json['id'],
+      productName = json['product_name'],
+      brand = json['brand'],
+      quantity = json['quantity'],
+      imageUrl = json['image_url'] ?? '',
+      missing = [
+        for (final entry in json['missing']) MissingData.fromJson(entry),
+      ],
+      missingCount = json['missing_count'],
+      shelfCount = json['shelf_count'],
+      status = json['status'],
+      statusLabel = json['status_label'];
 
   /// "Merek · isi", bagian yang kosong dilewati. "" kalau keduanya kosong.
-  String get subtitle => [brand, quantity].where((part) => part.trim().isNotEmpty).join(' · ');
+  String get subtitle =>
+      [brand, quantity].where((part) => part.trim().isNotEmpty).join(' · ');
 }
 
 /// Kartu statistik di atas antrean.
@@ -52,10 +55,10 @@ class QueueStats {
   final double? shelfAverage; // null kalau data shelf tidak tersedia
 
   QueueStats.fromJson(Map<String, dynamic> json)
-      : incompleteProducts = json['incomplete_products'],
-        submittedLast7Days = json['submitted_last_7_days'],
-        approved = json['approved'],
-        shelfAverage = (json['shelf_average'] as num?)?.toDouble();
+    : incompleteProducts = json['incomplete_products'],
+      submittedLast7Days = json['submitted_last_7_days'],
+      approved = json['approved'],
+      shelfAverage = (json['shelf_average'] as num?)?.toDouble();
 }
 
 /// Satu pilihan chip urutan atau filter, mis. {"key": "terbaru", "label": "Terbaru"}.
@@ -64,8 +67,8 @@ class QueueOption {
   final String label;
 
   QueueOption.fromJson(Map<String, dynamic> json)
-      : key = json['key'],
-        label = json['label'];
+    : key = json['key'],
+      label = json['label'];
 }
 
 /// Satu halaman antrean kontribusi.
@@ -85,23 +88,33 @@ class CorrectionQueue {
   final List<QueueProduct> results;
 
   CorrectionQueue.fromJson(Map<String, dynamic> json)
-      : count = json['count'],
-        page = json['page'],
-        pageSize = json['page_size'],
-        numPages = json['num_pages'],
-        nextPage = json['next_page'],
-        previousPage = json['previous_page'],
-        sort = json['sort'],
-        missing = json['missing'],
-        shelfAvailable = json['shelf_available'],
-        sortOptions = [for (final option in json['sort_options']) QueueOption.fromJson(option)],
-        missingOptions = [for (final option in json['missing_options']) QueueOption.fromJson(option)],
-        stats = QueueStats.fromJson(json['stats']),
-        results = [for (final row in json['results']) QueueProduct.fromJson(row)];
+    : count = json['count'],
+      page = json['page'],
+      pageSize = json['page_size'],
+      numPages = json['num_pages'],
+      nextPage = json['next_page'],
+      previousPage = json['previous_page'],
+      sort = json['sort'],
+      missing = json['missing'],
+      shelfAvailable = json['shelf_available'],
+      sortOptions = [
+        for (final option in json['sort_options']) QueueOption.fromJson(option),
+      ],
+      missingOptions = [
+        for (final option in json['missing_options'])
+          QueueOption.fromJson(option),
+      ],
+      stats = QueueStats.fromJson(json['stats']),
+      results = [for (final row in json['results']) QueueProduct.fromJson(row)];
 
   /// Alamat endpoint dengan query. Nilai null dan halaman 1 tidak ditulis.
   /// Contoh: uri(base, sort: 'terbaru', page: 2) -> base/api/v1/corrections/queue/?sort=terbaru&page=2
-  static Uri uri(String baseUrl, {String? sort, String? missing, int page = 1}) {
+  static Uri uri(
+    String baseUrl, {
+    String? sort,
+    String? missing,
+    int page = 1,
+  }) {
     final query = {
       'sort': ?sort,
       'missing': ?missing,
@@ -126,6 +139,8 @@ String formatThousands(int value) {
 /// Rata-rata kemunculan seperti di web: 0.1 -> "0,1×", 9.0 -> "9×", null -> "—".
 String formatTimes(double? value) {
   if (value == null) return '—';
-  final text = value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(1);
+  final text = value == value.roundToDouble()
+      ? value.toInt().toString()
+      : value.toStringAsFixed(1);
   return '${text.replaceAll('.', ',')}×';
 }

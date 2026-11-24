@@ -8,6 +8,8 @@ import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/data_correction_page.dart';
 
+import 'data_correction_fakes.dart';
+
 // Respons asli GET /api/v1/corrections/queue/ dari db.sqlite3 seed (results dipotong jadi 2).
 const sampleJson = r'''
 {"count": 347, "page": 1, "page_size": 20, "num_pages": 18, "next_page": 2, "previous_page": null,
@@ -42,24 +44,6 @@ const sampleJson = r'''
 ''';
 
 Map<String, dynamic> sample() => jsonDecode(sampleJson) as Map<String, dynamic>;
-
-/// CookieRequest palsu: get() mencatat URL lalu mengembalikan reply() (atau galat yang dilemparnya).
-class FakeRequest implements CookieRequest {
-  FakeRequest(this.reply);
-
-  final Object? Function() reply;
-  final urls = <String>[];
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) {
-    if (invocation.memberName == #get) {
-      urls.add(invocation.positionalArguments.first as String);
-      return Future<dynamic>.microtask(reply);
-    }
-    if (invocation.memberName == #loggedIn) return false;
-    return super.noSuchMethod(invocation);
-  }
-}
 
 /// Tanpa gambar, supaya tes tidak mengunduh dari jaringan.
 Map<String, dynamic> sampleWithoutImages() {

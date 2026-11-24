@@ -3,6 +3,7 @@ import 'package:pbp_django_auth/pbp_django_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/queue_widgets.dart';
 import 'package:pilihyuk_mobile/widgets/left_drawer.dart';
 
@@ -19,7 +20,14 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
   String? _sort; // null = urutan bawaan server
   String? _missing; // null = semua jenis data
   int _page = 1;
-  late Future<CorrectionQueue> _queue = _fetch();
+  late Future<CorrectionQueue> _queue;
+
+  // Future dibuat sekali di sini (Tutorial 10), bukan di build.
+  @override
+  void initState() {
+    super.initState();
+    _queue = _fetch();
+  }
 
   Future<CorrectionQueue> _fetch() async {
     final request = context.read<CookieRequest>();
@@ -73,8 +81,9 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
               return const Center(child: CircularProgressIndicator());
             }
             if (snapshot.hasError) {
-              return _message(
-                'Gagal memuat antrean. Tarik ke bawah untuk mencoba lagi.',
+              return ErrorView(
+                message: 'Gagal memuat antrean.',
+                onRetry: _reload,
               );
             }
             return _queueView(snapshot.data!, loading);
@@ -202,15 +211,4 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
       ],
     );
   }
-
-  // ListView, supaya tarik-untuk-muat-ulang tetap bisa saat galat.
-  Widget _message(String text) => ListView(
-    physics: const AlwaysScrollableScrollPhysics(),
-    children: [
-      Padding(
-        padding: const EdgeInsets.all(32),
-        child: Text(text, textAlign: TextAlign.center),
-      ),
-    ],
-  );
 }

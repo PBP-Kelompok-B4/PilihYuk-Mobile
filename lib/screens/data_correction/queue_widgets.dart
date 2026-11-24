@@ -1,15 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
-
-// Warna sama dengan situs web (templates/components/tailwind.html dan _status_chip.html).
-const _warm = Color(0xFFFBEBDD);
-const _warmText = Color(0xFFA33D00);
-const _surface = Color(0xFFF1EEE7);
-const _mint = Color(0xFFE1EFE6);
-const _leaf = Color(0xFFE4EFE0);
-const _brand = Color(0xFF1E6F4C);
-const _missingBackground = Color(0xFFFDF0C4);
-const _missingText = Color(0xFF6B4D00);
+import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 
 /// Empat kartu statistik, label sama dengan /antrean/ di situs web.
 class QueueStatsGrid extends StatelessWidget {
@@ -27,15 +18,15 @@ class QueueStatsGrid extends StatelessWidget {
     final cards = [
       _StatCard(
         icon: Icons.inbox_outlined,
-        background: _warm,
-        foreground: _warmText,
+        background: CorrectionColors.accentSoft,
+        foreground: CorrectionColors.accentText,
         value: formatThousands(stats.incompleteProducts),
         title: 'Menunggu kontribusi',
         caption: 'produk dengan data kosong',
       ),
       _StatCard(
         icon: Icons.calendar_today_outlined,
-        background: _surface,
+        background: CorrectionColors.secondary,
         foreground: Colors.black87,
         value: formatThousands(stats.submittedLast7Days),
         title: 'Diajukan minggu ini',
@@ -43,16 +34,16 @@ class QueueStatsGrid extends StatelessWidget {
       ),
       _StatCard(
         icon: Icons.check_circle_outline,
-        background: _mint,
-        foreground: _brand,
+        background: CorrectionColors.soft,
+        foreground: CorrectionColors.primary,
         value: formatThousands(stats.approved),
         title: 'Disetujui',
         caption: 'data berhasil dilengkapi',
       ),
       _StatCard(
         icon: Icons.layers_outlined,
-        background: _leaf,
-        foreground: _brand,
+        background: CorrectionColors.leaf,
+        foreground: CorrectionColors.primary,
         value: shelfAvailable ? formatTimes(stats.shelfAverage) : '—',
         title: 'Rata-rata di shelf',
         caption: shelfAvailable
@@ -228,7 +219,7 @@ class _ProductImage extends StatelessWidget {
       child: Container(
         width: 56,
         height: 56,
-        color: _surface,
+        color: CorrectionColors.secondary,
         alignment: Alignment.center,
         child: url.isEmpty
             ? placeholder
@@ -252,7 +243,7 @@ class _MissingChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: _missingBackground,
+        color: CorrectionColors.missing,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -261,12 +252,15 @@ class _MissingChip extends StatelessWidget {
           const Icon(
             Icons.warning_amber_rounded,
             size: 14,
-            color: _missingText,
+            color: CorrectionColors.missingText,
           ),
           const SizedBox(width: 4),
           Text(
             label,
-            style: const TextStyle(color: _missingText, fontSize: 12),
+            style: const TextStyle(
+              color: CorrectionColors.missingText,
+              fontSize: 12,
+            ),
           ),
         ],
       ),
@@ -287,13 +281,15 @@ class QueueStatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: verification ? _surface : _warm,
+        color: verification
+            ? CorrectionColors.secondary
+            : CorrectionColors.accentSoft,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: verification ? Colors.black87 : _warmText,
+          color: verification ? Colors.black87 : CorrectionColors.accentText,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),

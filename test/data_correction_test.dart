@@ -292,13 +292,24 @@ void main() {
       ); // tombol ajukan belum memanggil endpoint
     });
 
-    testWidgets('shows the error message when loading fails', (tester) async {
-      await pumpPage(tester, () => throw const FormatException('400'));
+    testWidgets('shows the error view and retries with Coba lagi', (
+      tester,
+    ) async {
+      var calls = 0;
+      final request = await pumpPage(tester, () {
+        calls++;
+        if (calls == 1) throw const FormatException('400');
+        return sampleWithoutImages();
+      });
       expect(find.widgetWithText(AppBar, 'Antrean Data'), findsOneWidget);
-      expect(
-        find.text('Gagal memuat antrean. Tarik ke bawah untuk mencoba lagi.'),
-        findsOneWidget,
-      );
+      expect(find.text('Gagal memuat antrean.'), findsOneWidget);
+
+      await tester.tap(find.text('Coba lagi'));
+      await tester.pump();
+      await tester.pump();
+      expect(request.urls, hasLength(2));
+      expect(find.text('Gagal memuat antrean.'), findsNothing);
+      expect(find.text('BLUE BAND CAKE & COOKIE'), findsOneWidget);
     });
 
     testWidgets('shows the empty state without a filter', (tester) async {

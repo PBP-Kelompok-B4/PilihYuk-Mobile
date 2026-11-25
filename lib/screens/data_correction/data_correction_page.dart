@@ -5,6 +5,7 @@ import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_form_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/my_corrections_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/queue_widgets.dart';
 import 'package:pilihyuk_mobile/widgets/left_drawer.dart';
 
@@ -85,10 +86,28 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
     }
   }
 
+  void _openMine() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MyCorrectionsPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Antrean Data')),
+      appBar: AppBar(
+        title: const Text('Antrean Data'),
+        actions: [
+          // Sementara memakai request.loggedIn; diganti hasil me/ di Tahap 16.
+          if (context.watch<CookieRequest>().loggedIn)
+            IconButton(
+              tooltip: 'Pengajuan Saya',
+              icon: const Icon(Icons.assignment_outlined),
+              onPressed: _openMine,
+            ),
+        ],
+      ),
       drawer: const LeftDrawer(),
       body: RefreshIndicator(
         onRefresh: _reload,

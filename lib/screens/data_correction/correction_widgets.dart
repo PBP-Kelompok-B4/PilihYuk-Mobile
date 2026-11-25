@@ -174,3 +174,82 @@ class PendingNotice extends StatelessWidget {
     );
   }
 }
+
+/// Keadaan kosong: ikon, judul, teks singkat, dan tombol opsional (seperti _empty_state.html di web).
+class EmptyState extends StatelessWidget {
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.text = '',
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String text;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = actionLabel;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 32),
+      decoration: BoxDecoration(
+        color: CorrectionColors.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: CorrectionColors.border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: CorrectionColors.secondary,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: CorrectionColors.muted),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: CorrectionColors.ink,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          if (text.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: CorrectionColors.muted,
+                fontSize: 13,
+              ),
+            ),
+          ],
+          if (label != null && onAction != null) ...[
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: onAction,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 44),
+                backgroundColor: CorrectionColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(label),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

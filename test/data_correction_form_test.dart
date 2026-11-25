@@ -1,13 +1,17 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:pbp_django_auth/pbp_django_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_detail_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_form_page.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/data_correction_page.dart';
 
 import 'data_correction_fakes.dart';
@@ -44,6 +48,18 @@ const queueJson = r'''
    "missing_count": 5, "shelf_count": 5, "status": "needs_contribution", "status_label": "Perlu kontribusi"}]}
 ''';
 
+// Bentuk balasan 201 POST mine/: serat 7,5 g dan natrium 500 mg (disimpan 0,5 g).
+const correctionJson = r'''
+{"id": 12, "product": {"id": 1, "product_name": "Sarimi Isi 2 Goreng", "brand": "Sarimi", "quantity": "88 g",
+  "image_url": "", "is_active": true},
+ "status": "pending", "status_label": "Menunggu", "is_withdrawable": true, "created_at": "2026-11-24T12:00:00.000000Z",
+ "items": [
+  {"id": 31, "field_name": "fiber_100g", "label": "Serat (g/100 g)", "old_value": null, "proposed_value": 7.5,
+   "old_display": null, "proposed_display": "7,5", "status": "pending", "status_label": "Menunggu", "review_note": ""},
+  {"id": 32, "field_name": "sodium_100g", "label": "Natrium (mg/100 g)", "old_value": 0.78, "proposed_value": 0.5,
+   "old_display": "780", "proposed_display": "500", "status": "pending", "status_label": "Menunggu", "review_note": ""}]}
+''';
+
 String formBody(List<String> focus) => jsonEncode({
   'product': {
     'id': 1,
@@ -68,6 +84,19 @@ http.Response formReply(http.Request request) {
     200,
   );
 }
+
+/// GET form dan POST mine/ yang berhasil.
+http.Response serverReply(http.Request request) => request.method == 'POST'
+    ? jsonResponse(correctionJson, 201)
+    : formReply(request);
+
+List<http.Request> posts(List<http.Request> log) => [
+  for (final request in log)
+    if (request.method == 'POST') request,
+];
+
+FilledButton submitButton(WidgetTester tester) =>
+    tester.widget<FilledButton>(find.byType(FilledButton));
 
 void useTallView(WidgetTester tester) {
   tester.view.physicalSize = const Size(1000, 5000);
@@ -185,8 +214,10 @@ void main() {
     },
   );
 
-  testWidgets('checks the inputs before sending', (tester) async {
-    await withMockServer(formReply, () async {
+  testWidgets('checks the inputs before sending and skips empty rows', (
+    tester,
+  ) async {
+    final log = await withMockServer(serverReply, () async {
       await pumpForm(tester, focus: ['nova_group', 'fiber_100g']);
       final inputs = find.byType(TextFormField);
 
@@ -210,10 +241,13 @@ void main() {
       await tester.enterText(inputs.at(0), '3');
       await tester.enterText(inputs.at(1), ''); // baris kosong tidak dikirim
       await tester.tap(find.text('Ajukan Koreksi'));
-      await tester.pump();
-      expect(find.text(checkInputsMessage), findsNothing);
-      expect(find.text('Pengiriman menyusul.'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(find.byType(CorrectionDetailPage), findsOneWidget);
     });
+    // single: percobaan yang salah tidak pernah dikirim.
+    expect(jsonDecode(posts(log).single.body)['items'], [
+      {'field_name': 'nova_group', 'proposed_value': '3'},
+    ]);
   });
 
   testWidgets('Coba lagi loads the form again after an error', (tester) async {
@@ -263,4 +297,252 @@ void main() {
       );
     },
   );
+
+  testWidgets('sends the values in display units and opens the success page', (
+    tester,
+  ) async {
+    final log = await withMockServer(serverReply, () async {
+      await pumpForm(tester, focus: ['fiber_100g', 'sodium_100g']);
+      final inputs = find.byType(TextFormField);
+      await tester.enterText(inputs.at(0), '7,5');
+      await tester.enterText(inputs.at(1), '500');
+      await tester.tap(find.text('Ajukan Koreksi'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CorrectionFormPage), findsNothing);
+      expect(
+        find.text('Pengajuan berhasil dikirim'),
+        findsNWidgets(2),
+      ); // judul dan toast
+      expect(find.text('Pengajuan Saya › Pengajuan #12'), findsOneWidget);
+      expect(
+        find.text('Pengajuan #12 · diajukan 24 November 2026'),
+        findsOneWidget,
+      );
+      expect(find.text('Sarimi Isi 2 Goreng'), findsOneWidget);
+      expect(find.text('Menunggu'), findsNWidgets(3)); // pengajuan dan dua item
+      expect(find.text('Nilai saat ini'), findsNWidgets(2));
+      expect(find.text('Tidak diketahui'), findsOneWidget);
+      expect(find.text('780'), findsOneWidget);
+      expect(
+        find.textContaining('· belum disetujui', findRichText: true),
+        findsNWidgets(2),
+      );
+      expect(
+        find.textContaining('Usulan belum disetujui', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.text('Kembali ke Antrean Data'), findsOneWidget);
+    });
+    final post = posts(log).single;
+    expect(
+      [post.url.toString(), post.headers['X-CSRFToken']],
+      ['$base/mine/', 't'],
+    );
+    expect(jsonDecode(post.body), {
+      'product': 1,
+      'items': [
+        {'field_name': 'fiber_100g', 'proposed_value': '7,5'},
+        {'field_name': 'sodium_100g', 'proposed_value': '500'},
+      ],
+    });
+  });
+
+  testWidgets('shows server field errors on the matching row', (tester) async {
+    const body =
+        '{"detail": "Periksa kembali isian koreksi.", "code": "validation_error", "fields": '
+        '{"sodium_100g": ["Usulan sama dengan nilai saat ini."], "code": ["Field ini tidak boleh dikoreksi."]}}';
+    final log = await withMockServer(
+      (request) => request.method == 'POST'
+          ? jsonResponse(body, 400)
+          : formReply(request),
+      () async {
+        await pumpForm(tester, focus: ['fiber_100g', 'sodium_100g']);
+        final inputs = find.byType(TextFormField);
+        await tester.enterText(inputs.at(0), '7,5');
+        await tester.enterText(inputs.at(1), '780');
+        await tester.tap(find.text('Ajukan Koreksi'));
+        await tester.pumpAndSettle();
+
+        const sameValue = 'Usulan sama dengan nilai saat ini.';
+        final sodiumRow = find.byKey(const ValueKey('correction-row-1'));
+        expect(
+          find.descendant(of: sodiumRow, matching: find.text(sameValue)),
+          findsOneWidget,
+        );
+        expect(find.text(sameValue), findsOneWidget); // bukan di baris serat
+        expect(
+          find.text(
+            'Periksa kembali isian koreksi.\nField ini tidak boleh dikoreksi.',
+          ),
+          findsOneWidget,
+        );
+        expect(find.byType(CorrectionFormPage), findsOneWidget);
+        expect(submitButton(tester).onPressed, isNotNull);
+      },
+    );
+    expect(posts(log), hasLength(1));
+  });
+
+  testWidgets('disables the button while the request is running', (
+    tester,
+  ) async {
+    final pending = Completer<http.Response>();
+    final sent = <http.Request>[];
+    await http.runWithClient(
+      () async {
+        await pumpForm(tester, focus: ['fiber_100g']);
+        await tester.enterText(find.byType(TextFormField), '7,5');
+        await tester.tap(find.text('Ajukan Koreksi'));
+        await tester.pump();
+        expect(submitButton(tester).onPressed, isNull);
+        expect(find.text('Mengirim…'), findsOneWidget);
+
+        await tester.tap(find.byType(FilledButton));
+        await tester.pump();
+        expect(sent, hasLength(1));
+
+        pending.complete(jsonResponse(correctionJson, 201));
+        await tester.pumpAndSettle();
+        expect(find.byType(CorrectionDetailPage), findsOneWidget);
+      },
+      () => MockClient((request) async {
+        if (request.method != 'POST') return formReply(request);
+        sent.add(request);
+        return pending.future;
+      }),
+    );
+    expect(sent, hasLength(1));
+  });
+
+  testWidgets('shows the right message for 403, 409 and network errors', (
+    tester,
+  ) async {
+    const inactive = 'Produk ini tidak aktif sehingga tidak bisa dikoreksi.';
+    var attempt = 0;
+    final log = await withMockServer(
+      (request) {
+        if (request.method != 'POST') {
+          return formReply(request);
+        }
+        attempt++;
+        if (attempt == 1) {
+          return jsonResponse(
+            '{"detail": "Silakan masuk terlebih dahulu.", "code": "authentication_required"}',
+            403,
+          );
+        }
+        if (attempt == 2) {
+          return jsonResponse(
+            '{"detail": "$inactive", "code": "product_inactive"}',
+            409,
+          );
+        }
+        if (attempt == 3) {
+          throw http.ClientException('Connection refused');
+        }
+        return jsonResponse(correctionJson, 201);
+      },
+      () async {
+        await pumpForm(tester, focus: ['fiber_100g']);
+        await tester.enterText(find.byType(TextFormField), '7,5');
+        await tester.tap(find.text('Ajukan Koreksi'));
+        await tester.pumpAndSettle();
+        expect(find.text(sessionEndedMessage), findsOneWidget);
+
+        await tester.tap(find.text('Ajukan Koreksi'));
+        await tester.pumpAndSettle();
+        expect(find.text(sessionEndedMessage), findsNothing);
+        expect(find.text(inactive), findsOneWidget);
+        expect(find.widgetWithText(SnackBarAction, 'Coba lagi'), findsNothing);
+
+        await tester.tap(find.text('Ajukan Koreksi'));
+        await tester.pumpAndSettle();
+        expect(find.text(inactive), findsNothing);
+        expect(find.text(ApiError.defaultMessage(0)), findsOneWidget);
+
+        await tester.tap(find.widgetWithText(SnackBarAction, 'Coba lagi'));
+        await tester.pumpAndSettle();
+        expect(find.byType(CorrectionDetailPage), findsOneWidget);
+      },
+    );
+    expect(posts(log), hasLength(4));
+  });
+
+  testWidgets('Kembali ke Antrean Data returns to a reloaded queue', (
+    tester,
+  ) async {
+    var loads = 0;
+    final request = FakeRequest(() {
+      final json = jsonDecode(queueJson) as Map<String, dynamic>;
+      if (loads++ > 0) {
+        json['results'][0]
+          ..['status'] = 'needs_verification'
+          ..['status_label'] = 'Perlu verifikasi';
+      }
+      return json;
+    })..loggedIn = true;
+    await withMockServer(serverReply, () async {
+      useTallView(tester);
+      await tester.pumpWidget(
+        Provider<CookieRequest>.value(
+          value: request,
+          child: const MaterialApp(home: DataCorrectionPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Perlu kontribusi'), findsOneWidget);
+
+      await tester.tap(find.text('Lengkapi Data'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).first, '7,5');
+      await tester.tap(find.text('Ajukan Koreksi'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kembali ke Antrean Data'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DataCorrectionPage), findsOneWidget);
+      expect(find.text('Perlu verifikasi'), findsOneWidget);
+      expect(find.text('Perlu kontribusi'), findsNothing);
+    });
+    expect(request.urls, hasLength(2));
+  });
+
+  testWidgets('the detail page loads by id and retries with Coba lagi', (
+    tester,
+  ) async {
+    var calls = 0;
+    final log = await withMockServer(
+      (request) => ++calls == 1
+          ? jsonResponse(
+              '{"detail": "Pengajuan tidak ditemukan.", "code": "correction_not_found"}',
+              404,
+            )
+          : jsonResponse(correctionJson, 200),
+      () async {
+        useTallView(tester);
+        await tester.pumpWidget(
+          Provider<CookieRequest>.value(
+            value: FakeRequest(),
+            child: const MaterialApp(
+              home: CorrectionDetailPage(correctionId: 12),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Pengajuan tidak ditemukan.'), findsOneWidget);
+
+        await tester.tap(find.text('Coba lagi'));
+        await tester.pumpAndSettle();
+        expect(find.text('Detail pengajuan'), findsOneWidget);
+        expect(find.text('Nilai saat diajukan'), findsNWidgets(2));
+        expect(find.text('Pengajuan berhasil dikirim'), findsNothing);
+        expect(find.text('Kembali ke Antrean Data'), findsNothing);
+      },
+    );
+    expect(
+      [for (final request in log) request.url.toString()],
+      ['$base/mine/12/', '$base/mine/12/'],
+    );
+  });
 }

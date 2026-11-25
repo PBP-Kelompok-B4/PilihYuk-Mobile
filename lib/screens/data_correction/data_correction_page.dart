@@ -60,7 +60,8 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
   }
 
   // Sementara memakai request.loggedIn; gerbang login lewat me/ dibuat di Tahap 16.
-  void _contribute(QueueProduct product) {
+  // Form mengembalikan true setelah pengajuan terkirim, lalu antrean dimuat ulang.
+  Future<void> _contribute(QueueProduct product) async {
     if (!context.read<CookieRequest>().loggedIn) {
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
@@ -73,12 +74,15 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
       for (final entry in product.missing)
         if (entry.correctable) ...entry.fields,
     ];
-    Navigator.push(
+    final submitted = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => CorrectionFormPage(productId: product.id, focus: focus),
       ),
     );
+    if (submitted == true && mounted) {
+      await _reload();
+    }
   }
 
   @override

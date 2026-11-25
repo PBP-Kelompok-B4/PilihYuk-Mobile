@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:pilihyuk_mobile/models/data_correction.dart';
+
+/// Pesan untuk 403 authentication_required (sesi habis).
+const sessionEndedMessage = 'Sesi berakhir, silakan masuk lagi.';
 
 /// Warna bersama halaman Antrean Data: token Figma (285:5593) dan warna khusus web.
 abstract final class CorrectionColors {
@@ -27,6 +31,8 @@ abstract final class CorrectionColors {
   static const leaf = Color(0xFFE4EFE0);
   static const missing = Color(0xFFFDF0C4);
   static const missingText = Color(0xFF6B4D00);
+  static const rejectedSoft = Color(0xFFFDE7E4);
+  static const rejectedText = Color(0xFFB42318);
 }
 
 /// Pesan galat dengan tombol "Coba lagi". Berupa ListView, jadi tetap bisa ditarik untuk memuat ulang.
@@ -81,6 +87,89 @@ class UnknownChip extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
+      ),
+    );
+  }
+}
+
+/// Chip status pengajuan atau item. Warnanya sama dengan _status_chip.html: Menunggu abu, Disetujui hijau,
+/// Ditolak merah, Sebagian disetujui hijau muda.
+class CorrectionStatusChip extends StatelessWidget {
+  const CorrectionStatusChip({
+    super.key,
+    required this.status,
+    required this.label,
+  });
+
+  final String status;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final (background, foreground) = switch (status) {
+      CorrectionStatus.approved => (
+        CorrectionColors.soft,
+        CorrectionColors.primary,
+      ),
+      CorrectionStatus.rejected => (
+        CorrectionColors.rejectedSoft,
+        CorrectionColors.rejectedText,
+      ),
+      CorrectionStatus.partial => (CorrectionColors.leaf, CorrectionColors.ink),
+      _ => (CorrectionColors.secondary, CorrectionColors.ink),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: foreground,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// Catatan "Usulan belum disetujui" di form dan di detail pengajuan yang masih menunggu.
+class PendingNotice extends StatelessWidget {
+  const PendingNotice({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: CorrectionColors.warningSoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 18, color: CorrectionColors.warning),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                style: TextStyle(color: CorrectionColors.warning, fontSize: 13),
+                children: [
+                  TextSpan(
+                    text: 'Usulan belum disetujui. ',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  TextSpan(
+                    text: 'Data produk tetap seperti sekarang sampai pengajuan ditinjau kurator.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

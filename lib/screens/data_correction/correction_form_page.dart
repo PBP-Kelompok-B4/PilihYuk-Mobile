@@ -3,6 +3,7 @@ import 'package:pbp_django_auth/pbp_django_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_detail_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 
 const requiredMessage = 'Isian ini wajib diisi.';
@@ -38,7 +39,8 @@ String? checkProposedValue(CorrectionField field, String raw) {
 }
 
 /// Form Lengkapi Data untuk satu produk aktif (GET products/{id}/form/). focus = field kosong dari kartu
-/// antrean; tiap field menjadi satu baris awal.
+/// antrean; tiap field menjadi satu baris awal. Setelah POST mine/ berhasil, route ini diganti halaman detail
+/// dan antrean menerima hasil true.
 class CorrectionFormPage extends StatefulWidget {
   const CorrectionFormPage({
     super.key,
@@ -66,6 +68,8 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
   late Future<CorrectionFormData> _form;
   String? _alert;
   bool _anyFilled = true;
+  bool _sending = false;
+  Map<String, String> _serverErrors = const {};
 
   @override
   void initState() {
@@ -122,20 +126,88 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
         row.field!: row.controller.text.trim(),
   };
 
-  void _submit() {
-    _anyFilled = _values().isNotEmpty;
-    final valid = _formKey.currentState!.validate();
-    setState(() {
-      _alert = !_anyFilled
-          ? noneFilledMessage
-          : (valid ? null : checkInputsMessage);
-    });
-    if (!_anyFilled || !valid) {
+  Future<void> _submit() async {
+    if (_sending) {
       return;
     }
+    _serverErrors = const {};
+    final values = _values();
+    _anyFilled = values.isNotEmpty;
+    final valid = _formKey.currentState!.validate();
+    if (!_anyFilled || !valid) {
+      setState(() {
+        _alert = _anyFilled ? checkInputsMessage : noneFilledMessage;
+      });
+      return;
+    }
+    setState(() {
+      _alert = null;
+      _sending = true;
+    });
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    try {
+      final correction = await CorrectionApi(context.read<CookieRequest>())
+          .submit(widget.productId, values);
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CorrectionDetailPage(
+            correctionId: correction.id,
+            initial: correction,
+            justSubmitted: true,
+          ),
+        ),
+        result: true,
+      );
+    } on ApiError catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _sending = false;
+      });
+      _showError(error);
+    }
+  }
+
+  /// 400: pesan per baris + kotak galat; 403: kotak galat; selain itu SnackBar (Coba lagi bila jaringan/server).
+  void _showError(ApiError error) {
+    if (error.status == 403) {
+      setState(() {
+        _alert = error.needsLogin ? sessionEndedMessage : error.message;
+      });
+      return;
+    }
+    if (error.status == 400) {
+      final named = {
+        for (final row in _rows)
+          if (row.field != null) row.field!,
+      };
+      _serverErrors = {for (final name in named) name: ?error.fieldError(name)};
+      final others = [
+        for (final entry in error.fields.entries)
+          if (!named.contains(entry.key)) ...entry.value,
+      ];
+      _formKey.currentState!.validate();
+      setState(() {
+        _alert = [error.message, ...others].join('\n');
+      });
+      return;
+    }
+    final retry = error.isNetwork || error.status >= 500;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Pengiriman menyusul.')));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          action: retry
+              ? SnackBarAction(label: 'Coba lagi', onPressed: _submit)
+              : null,
+        ),
+      );
   }
 
   String? _validate(CorrectionField? field, String? text) {
@@ -145,7 +217,8 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
     if ((text ?? '').trim().isEmpty) {
       return _anyFilled ? null : requiredMessage;
     }
-    return checkProposedValue(field, text ?? '');
+    return checkProposedValue(field, text ?? '') ??
+        _serverErrors[field.fieldName];
   }
 
   @override
@@ -237,26 +310,45 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const _Notice(),
+                const PendingNotice(),
               ],
             ),
           ),
           if (_alert != null) ...[const SizedBox(height: 16), _Alert(_alert!)],
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: _submit,
+            onPressed: _sending ? null : _submit,
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
               backgroundColor: CorrectionColors.primary,
+              disabledBackgroundColor: CorrectionColors.primary.withValues(
+                alpha: 0.45,
+              ),
+              disabledForegroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: const Text('Ajukan Koreksi'),
+            child: _sending
+                ? const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Text('Mengirim…'),
+                    ],
+                  )
+                : const Text('Ajukan Koreksi'),
           ),
           const SizedBox(height: 8),
           TextButton(
-            onPressed: () => Navigator.maybePop(context),
+            onPressed: _sending ? null : () => Navigator.maybePop(context),
             style: TextButton.styleFrom(minimumSize: const Size.fromHeight(44)),
             child: const Text('Batal'),
           ),
@@ -415,35 +507,6 @@ class _ReadOnlyBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: child,
-    );
-  }
-}
-
-class _Notice extends StatelessWidget {
-  const _Notice();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: CorrectionColors.warningSoft,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Text.rich(
-        TextSpan(
-          style: TextStyle(color: CorrectionColors.warning, fontSize: 13),
-          children: [
-            TextSpan(
-              text: 'Usulan belum disetujui. ',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            TextSpan(
-              text: 'Data produk tetap seperti sekarang sampai pengajuan ditinjau kurator.',
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

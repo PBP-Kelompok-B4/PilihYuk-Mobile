@@ -3,6 +3,7 @@ import 'package:pbp_django_auth/pbp_django_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_form_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/queue_widgets.dart';
 import 'package:pilihyuk_mobile/widgets/left_drawer.dart';
@@ -58,10 +59,26 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
     _reload();
   }
 
-  void _comingSoon() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Segera hadir')));
+  // Sementara memakai request.loggedIn; gerbang login lewat me/ dibuat di Tahap 16.
+  void _contribute(QueueProduct product) {
+    if (!context.read<CookieRequest>().loggedIn) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Masuk dulu untuk mengajukan koreksi.')),
+        );
+      return;
+    }
+    final focus = [
+      for (final entry in product.missing)
+        if (entry.correctable) ...entry.fields,
+    ];
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CorrectionFormPage(productId: product.id, focus: focus),
+      ),
+    );
   }
 
   @override
@@ -163,7 +180,10 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
           )
         else ...[
           for (final product in queue.results)
-            QueueProductCard(product: product, onContribute: _comingSoon),
+            QueueProductCard(
+              product: product,
+              onContribute: () => _contribute(product),
+            ),
           _pagination(queue),
         ],
       ],

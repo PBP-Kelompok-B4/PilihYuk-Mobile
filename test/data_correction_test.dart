@@ -269,11 +269,8 @@ void main() {
 
       await tester.tap(find.text('Lengkapi Data').first);
       await tester.pump();
-      expect(find.text('Segera hadir'), findsOneWidget);
-      expect(
-        request.urls,
-        hasLength(3),
-      ); // tombol ajukan belum memanggil endpoint
+      expect(find.text('Masuk dulu untuk mengajukan koreksi.'), findsOneWidget);
+      expect(request.urls, hasLength(3)); // belum masuk: form tidak dibuka
     });
 
     testWidgets('shows the error view and retries with Coba lagi', (

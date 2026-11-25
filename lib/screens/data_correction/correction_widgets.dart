@@ -61,3 +61,27 @@ class ErrorView extends StatelessWidget {
     );
   }
 }
+
+/// Chip "Tidak diketahui" untuk nilai kosong, warnanya sama dengan web.
+class UnknownChip extends StatelessWidget {
+  const UnknownChip({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: CorrectionColors.missing,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Text(
+        'Tidak diketahui',
+        style: TextStyle(
+          color: CorrectionColors.missingText,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
 
 /// Pesan untuk 403 authentication_required (sesi habis).
 const sessionEndedMessage = 'Sesi berakhir, silakan masuk lagi.';
+const withdrawnMessage = 'Pengajuan berhasil ditarik.';
 
 /// Warna bersama halaman Antrean Data: token Figma (285:5593) dan warna khusus web.
 abstract final class CorrectionColors {
@@ -250,6 +252,195 @@ class EmptyState extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Sheet konfirmasi (Figma 285:8350): ikon merah, judul, teks, tombol "Batal" abu dan tombol merah berikon.
+/// true hanya bila tombol konfirmasi ditekan; Batal, X, atau menutup sheet -> false.
+Future<bool> showConfirmSheet(
+  BuildContext context, {
+  required String title,
+  required String message,
+  required String confirmLabel,
+  IconData icon = Icons.delete_outline,
+}) async {
+  final confirmed = await showModalBottomSheet<bool>(
+    context: context,
+    backgroundColor: CorrectionColors.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (context) => _ConfirmSheet(
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+      icon: icon,
+    ),
+  );
+  return confirmed == true;
+}
+
+class _ConfirmSheet extends StatelessWidget {
+  const _ConfirmSheet({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.icon,
+  });
+
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(10),
+    );
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: IconButton(
+                tooltip: 'Tutup',
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context, false),
+              ),
+            ),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: CorrectionColors.errorSoft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: CorrectionColors.error),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: CorrectionColors.ink,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: CorrectionColors.muted,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: CorrectionColors.tertiary,
+                      foregroundColor: CorrectionColors.ink,
+                      shape: shape,
+                    ),
+                    child: const Text('Batal'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: CorrectionColors.error,
+                      foregroundColor: Colors.white,
+                      shape: shape,
+                    ),
+                    icon: Icon(icon),
+                    label: Text(confirmLabel),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Tombol "Tarik pengajuan" bergaris merah. busy menampilkan indikator dan menonaktifkan tombol.
+class WithdrawButton extends StatelessWidget {
+  const WithdrawButton({super.key, required this.onPressed, this.busy = false});
+
+  final VoidCallback? onPressed;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: busy ? null : onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 44),
+        foregroundColor: CorrectionColors.error,
+        side: BorderSide(color: CorrectionColors.error.withValues(alpha: 0.4)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+      child: busy
+          ? const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                SizedBox(width: 8),
+                Text('Menarik…'),
+              ],
+            )
+          : const Text('Tarik pengajuan'),
+    );
+  }
+}
+
+/// Konfirmasi tarik dengan teks yang sama dengan _withdraw_dialog.html.
+Future<bool> confirmWithdraw(BuildContext context, Correction correction) {
+  final name = correction.product.productName.trim();
+  return showConfirmSheet(
+    context,
+    title: 'Tarik pengajuan ini?',
+    message:
+        'Pengajuan untuk ${name.isEmpty ? 'produk ini' : name} akan dihapus beserta semua usulannya '
+        'dan tidak bisa dikembalikan.',
+    confirmLabel: 'Tarik Pengajuan',
+  );
+}
+
+/// Hasil DELETE mine/{id}/. gone: pengajuan sudah tidak ada (204 atau 404). reload: data di layar perlu dimuat
+/// ulang (gone, atau 409 karena kurator baru saja meninjau). message: teks untuk SnackBar.
+typedef WithdrawOutcome = ({bool gone, bool reload, String message});
+
+Future<WithdrawOutcome> withdrawCorrection(CorrectionApi api, int id) async {
+  try {
+    await api.withdraw(id);
+    return (gone: true, reload: true, message: withdrawnMessage);
+  } on ApiError catch (error) {
+    final gone = error.status == 404;
+    return (
+      gone: gone,
+      reload: gone || error.status == 409,
+      message: error.needsLogin ? sessionEndedMessage : error.message,
     );
   }
 }

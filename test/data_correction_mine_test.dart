@@ -7,6 +7,7 @@ import 'package:pbp_django_auth/pbp_django_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_detail_page.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/data_correction_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/my_corrections_page.dart';
 
@@ -60,10 +61,60 @@ const emptyQueueJson = r'''
  "results": []}
 ''';
 
+const notWithdrawable =
+    'Pengajuan ini sudah mulai ditinjau sehingga tidak bisa ditarik.';
+const withdrawText =
+    'Pengajuan untuk Sarimi Isi 2 Goreng akan dihapus beserta semua usulannya dan tidak bisa dikembalikan.';
+
 /// ?page=2 -> halaman 2, selain itu halaman 1.
 http.Response pagedReply(http.Request request) => jsonResponse(
   request.url.queryParameters['page'] == '2' ? pageTwoJson : pageOneJson,
   200,
+);
+
+/// Halaman 1 setelah #12 ditarik: tinggal #9, satu halaman.
+String withoutFirst() {
+  final json = jsonDecode(pageOneJson) as Map<String, dynamic>;
+  (json['results'] as List).removeAt(0);
+  json
+    ..['count'] = 10
+    ..['num_pages'] = 1
+    ..['next_page'] = null;
+  return jsonEncode(json);
+}
+
+/// Halaman 1 setelah kurator menyetujui #12: tidak bisa ditarik lagi.
+String reviewedFirst() {
+  final json = jsonDecode(pageOneJson) as Map<String, dynamic>;
+  json['results'][0]
+    ..['status'] = 'approved'
+    ..['status_label'] = 'Disetujui'
+    ..['is_withdrawable'] = false;
+  json['results'][0]['items'][0]
+    ..['status'] = 'approved'
+    ..['status_label'] = 'Disetujui';
+  return jsonEncode(json);
+}
+
+/// Server palsu: DELETE mine/12/ -> 204, lalu GET mine/ tanpa #12.
+http.Response Function(http.Request) withdrawServer() {
+  var withdrawn = false;
+  return (request) {
+    if (request.method == 'DELETE') {
+      withdrawn = true;
+      return http.Response('', 204);
+    }
+    return jsonResponse(withdrawn ? withoutFirst() : pageOneJson, 200);
+  };
+}
+
+List<String> requestLines(List<http.Request> log) => [
+  for (final request in log) '${request.method} ${request.url}',
+];
+
+Finder inCard(int id, String text) => find.descendant(
+  of: find.byKey(ValueKey('correction-$id')),
+  matching: find.text(text),
 );
 
 void useTallView(WidgetTester tester) {
@@ -253,5 +304,117 @@ void main() {
       expect(find.text('Sarimi Isi 2 Goreng'), findsOneWidget);
     });
     expect(log.single.url.toString(), '$base/mine/');
+  });
+
+  testWidgets('Tarik pengajuan only shows for withdrawable corrections', (
+    tester,
+  ) async {
+    await withMockServer(pagedReply, () async {
+      await pumpMine(tester);
+      expect(find.text('Tarik pengajuan'), findsOneWidget);
+      expect(inCard(12, 'Tarik pengajuan'), findsOneWidget);
+      expect(inCard(9, 'Tarik pengajuan'), findsNothing);
+    });
+  });
+
+  testWidgets('Batal closes the sheet without sending DELETE', (tester) async {
+    final log = await withMockServer(pagedReply, () async {
+      await pumpMine(tester);
+      await tester.tap(find.text('Tarik pengajuan'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tarik pengajuan ini?'), findsOneWidget);
+      expect(find.text(withdrawText), findsOneWidget);
+
+      await tester.tap(find.text('Batal'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tarik pengajuan ini?'), findsNothing);
+      expect(find.byKey(const ValueKey('correction-12')), findsOneWidget);
+    });
+    expect(requestLines(log), ['GET $base/mine/']);
+  });
+
+  testWidgets('Tarik Pengajuan sends DELETE and the card disappears', (
+    tester,
+  ) async {
+    final log = await withMockServer(withdrawServer(), () async {
+      await pumpMine(tester);
+      await tester.tap(find.text('Tarik pengajuan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tarik Pengajuan'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('correction-12')), findsNothing);
+      expect(find.byKey(const ValueKey('correction-9')), findsOneWidget);
+      expect(find.text(withdrawnMessage), findsOneWidget);
+    });
+    expect(requestLines(log), [
+      'GET $base/mine/',
+      'DELETE $base/mine/12/',
+      'GET $base/mine/',
+    ]);
+    expect(log[1].headers['X-CSRFToken'], 't');
+  });
+
+  testWidgets('409 shows the server message and reloads the status', (
+    tester,
+  ) async {
+    var refused = false;
+    final log = await withMockServer(
+      (request) {
+        if (request.method == 'DELETE') {
+          refused = true;
+          return jsonResponse(
+            '{"detail": "$notWithdrawable", "code": "not_withdrawable"}',
+            409,
+          );
+        }
+        return jsonResponse(refused ? reviewedFirst() : pageOneJson, 200);
+      },
+      () async {
+        await pumpMine(tester);
+        await tester.tap(find.text('Tarik pengajuan'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Tarik Pengajuan'));
+        await tester.pumpAndSettle();
+
+        expect(find.text(notWithdrawable), findsOneWidget);
+        expect(find.text('Tarik pengajuan'), findsNothing);
+        expect(inCard(12, 'Menunggu'), findsNothing);
+        expect(
+          inCard(12, 'Disetujui'),
+          findsNWidgets(2),
+        ); // pengajuan dan itemnya
+      },
+    );
+    expect(requestLines(log), [
+      'GET $base/mine/',
+      'DELETE $base/mine/12/',
+      'GET $base/mine/',
+    ]);
+  });
+
+  testWidgets('Tarik from the detail page returns to a reloaded list', (
+    tester,
+  ) async {
+    final log = await withMockServer(withdrawServer(), () async {
+      await pumpMine(tester);
+      await tester.tap(find.text('Lihat detail').first);
+      await tester.pumpAndSettle();
+      expect(find.text('Detail pengajuan'), findsOneWidget);
+
+      await tester.tap(find.text('Tarik pengajuan'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tarik Pengajuan'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CorrectionDetailPage), findsNothing);
+      expect(find.byKey(const ValueKey('correction-12')), findsNothing);
+      expect(find.text(withdrawnMessage), findsOneWidget);
+    });
+    expect(requestLines(log), [
+      'GET $base/mine/',
+      'DELETE $base/mine/12/',
+      'GET $base/mine/',
+    ]);
   });
 }

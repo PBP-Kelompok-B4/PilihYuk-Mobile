@@ -7,7 +7,7 @@ import 'package:pilihyuk_mobile/screens/data_correction/correction_detail_page.d
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 
 /// Pengajuan Saya: koreksi milik pengguna yang sedang masuk (GET mine/?page=), terbaru dulu, 10 per halaman.
-/// Isinya sama dengan /antrean/saya/ di web.
+/// Isinya sama dengan /antrean/saya/ di web. Setelah menarik pengajuan, halaman dimuat ulang dari server.
 class MyCorrectionsPage extends StatefulWidget {
   const MyCorrectionsPage({super.key});
 
@@ -17,6 +17,7 @@ class MyCorrectionsPage extends StatefulWidget {
 
 class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
   int _page = 1;
+  int? _withdrawing; // id pengajuan yang sedang ditarik
   late Future<CorrectionList> _list;
 
   @override
@@ -25,8 +26,12 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
     _list = _fetch();
   }
 
-  Future<CorrectionList> _fetch() =>
-      CorrectionApi(context.read<CookieRequest>()).mine(page: _page);
+  Future<CorrectionList> _fetch() async {
+    final list = await CorrectionApi(context.read<CookieRequest>())
+        .mine(page: _page);
+    _page = list.page; // halaman yang kosong setelah ditarik diganti server dengan halaman terakhir
+    return list;
+  }
 
   Future<void> _reload() {
     setState(() {
@@ -40,8 +45,8 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
     _reload();
   }
 
-  void _openDetail(Correction correction) {
-    Navigator.push(
+  Future<void> _openDetail(Correction correction) async {
+    final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => CorrectionDetailPage(
@@ -50,6 +55,38 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
         ),
       ),
     );
+    if (changed == true && mounted) {
+      await _reload();
+    }
+  }
+
+  Future<void> _withdraw(Correction correction) async {
+    final confirmed = await confirmWithdraw(context, correction);
+    if (!confirmed) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _withdrawing = correction.id;
+    });
+    final outcome = await withdrawCorrection(
+      CorrectionApi(context.read<CookieRequest>()),
+      correction.id,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _withdrawing = null;
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(outcome.message)));
+    if (outcome.reload) {
+      await _reload();
+    }
   }
 
   @override
@@ -103,8 +140,13 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
         else ...[
           for (final correction in list.results)
             _CorrectionCard(
+              key: ValueKey('correction-${correction.id}'),
               correction: correction,
               onOpen: () => _openDetail(correction),
+              onWithdraw: _withdrawing == null
+                  ? () => _withdraw(correction)
+                  : null,
+              withdrawing: _withdrawing == correction.id,
             ),
           if (list.numPages > 1) _pagination(list),
         ],
@@ -142,10 +184,19 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
 }
 
 class _CorrectionCard extends StatelessWidget {
-  const _CorrectionCard({required this.correction, required this.onOpen});
+  const _CorrectionCard({
+    super.key,
+    required this.correction,
+    required this.onOpen,
+    required this.onWithdraw,
+    this.withdrawing = false,
+  });
 
   final Correction correction;
   final VoidCallback onOpen;
+  final VoidCallback?
+  onWithdraw; // null selama ada pengajuan lain yang sedang ditarik
+  final bool withdrawing;
 
   @override
   Widget build(BuildContext context) {
@@ -196,20 +247,25 @@ class _CorrectionCard extends StatelessWidget {
           const SizedBox(height: 8),
           for (final item in correction.items) _ItemRow(item: item),
           const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton(
-              onPressed: onOpen,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                foregroundColor: CorrectionColors.ink,
-                side: const BorderSide(color: CorrectionColors.border),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                onPressed: onOpen,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  foregroundColor: CorrectionColors.ink,
+                  side: const BorderSide(color: CorrectionColors.border),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
+                child: const Text('Lihat detail'),
               ),
-              child: const Text('Lihat detail'),
-            ),
+              if (correction.isWithdrawable)
+                WithdrawButton(onPressed: onWithdraw, busy: withdrawing),
+            ],
           ),
         ],
       ),

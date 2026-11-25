@@ -7,6 +7,7 @@ import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart'
 
 /// Detail satu pengajuan milik sendiri. initial dipakai apa adanya (mis. balasan 201); tanpa initial,
 /// data dimuat dari GET mine/{id}/. justSubmitted menampilkan keadaan "Pengajuan berhasil dikirim".
+/// Ditutup dengan hasil true bila pengajuan berubah (ditarik atau ternyata sudah ditinjau), supaya daftar dimuat ulang.
 class CorrectionDetailPage extends StatefulWidget {
   const CorrectionDetailPage({
     super.key,
@@ -25,6 +26,8 @@ class CorrectionDetailPage extends StatefulWidget {
 
 class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
   late Future<Correction> _correction;
+  bool _withdrawing = false;
+  bool _changed = false;
 
   @override
   void initState() {
@@ -42,29 +45,72 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
     });
   }
 
+  Future<void> _withdraw(Correction correction) async {
+    final confirmed = await confirmWithdraw(context, correction);
+    if (!confirmed) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _withdrawing = true;
+    });
+    final outcome = await withdrawCorrection(
+      CorrectionApi(context.read<CookieRequest>()),
+      correction.id,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _withdrawing = false;
+    });
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(outcome.message)));
+    if (outcome.gone) {
+      Navigator.pop(context, true);
+    } else if (outcome.reload) {
+      setState(() {
+        _changed = true;
+        _correction = _load();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Antrean Data')),
-      body: FutureBuilder<Correction>(
-        future: _correction,
-        initialData: widget.initial,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done &&
-              !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final error = snapshot.error;
-          if (error != null) {
-            return ErrorView(
-              message: error is ApiError
-                  ? error.message
-                  : 'Gagal memuat pengajuan.',
-              onRetry: _reload,
-            );
-          }
-          return _detailView(snapshot.data!);
-        },
+    // Setelah status berubah, tombol kembali tetap menutup halaman tetapi dengan hasil true.
+    return PopScope<bool>(
+      canPop: !_changed,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.pop(context, true);
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Antrean Data')),
+        body: FutureBuilder<Correction>(
+          future: _correction,
+          initialData: widget.initial,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done &&
+                !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final error = snapshot.error;
+            if (error != null) {
+              return ErrorView(
+                message: error is ApiError
+                    ? error.message
+                    : 'Gagal memuat pengajuan.',
+                onRetry: _reload,
+              );
+            }
+            return _detailView(snapshot.data!);
+          },
+        ),
       ),
     );
   }
@@ -150,6 +196,16 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
               if (correction.status == CorrectionStatus.pending) ...[
                 const SizedBox(height: 4),
                 const PendingNotice(),
+              ],
+              if (!submitted && correction.isWithdrawable) ...[
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: WithdrawButton(
+                    onPressed: () => _withdraw(correction),
+                    busy: _withdrawing,
+                  ),
+                ),
               ],
             ],
           ),

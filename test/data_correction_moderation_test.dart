@@ -126,10 +126,6 @@ void main() {
       expect(find.text('Menunggu'), findsNWidgets(2));
       expect(find.text('Nilai berubah'), findsOneWidget);
       expect(find.text('Review'), findsNWidgets(2));
-
-      await tester.tap(find.text('Review').first);
-      await tester.pump();
-      expect(find.text('Halaman review menyusul.'), findsOneWidget);
     });
     expect(log.single.url.toString(), '$base/moderation/');
   });

@@ -5,6 +5,7 @@ import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/queue_widgets.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/review_page.dart';
 
 /// Moderasi Data untuk kurator. Tab antrean dan semua: item per field dari GET moderation/ (20 per halaman);
 /// tab panduan: GET moderation/guide/. Isinya sama dengan /moderasi/ di web.
@@ -90,11 +91,15 @@ class _ModerationPageState extends State<ModerationPage> {
     });
   }
 
-  // Layar Review dibuat di Tahap 15.
-  void _review(ModerationRow row) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(const SnackBar(content: Text('Halaman review menyusul.')));
+  /// ReviewPage kembali dengan true bila item sudah disetujui atau ditolak; daftar lalu dimuat ulang.
+  Future<void> _review(ModerationRow row) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => ReviewPage(itemId: row.id)),
+    );
+    if (changed == true && mounted) {
+      await _reload();
+    }
   }
 
   @override

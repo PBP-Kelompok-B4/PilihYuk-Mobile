@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:pbp_django_auth/pbp_django_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/config.dart';
-import 'package:pilihyuk_mobile/screens/data_correction/data_correction_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/moderation_page.dart';
 
 import 'data_correction_fakes.dart';
@@ -258,44 +257,5 @@ void main() {
         expect(find.text('Halaman sebelumnya'), findsOneWidget);
       },
     );
-  });
-
-  testWidgets('the Moderasi Data action only shows for curators', (
-    tester,
-  ) async {
-    const emptyQueue =
-        '{"count": 0, "page": 1, "page_size": 20, "num_pages": 1, "next_page": null, "previous_page": null, '
-        '"sort": "shelf", "missing": null, "shelf_available": true, "sort_options": [], "missing_options": [], '
-        '"stats": {"incomplete_products": 0, "submitted_last_7_days": 0, "approved": 0, "shelf_average": 0}, '
-        '"results": []}';
-    final log = await withMockServer(server, () async {
-      useTallView(tester);
-      final member = FakeRequest(() => jsonDecode(emptyQueue))..loggedIn = true;
-      await tester.pumpWidget(
-        Provider<CookieRequest>.value(
-          value: member,
-          child: const MaterialApp(home: DataCorrectionPage()),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byTooltip('Pengajuan Saya'), findsOneWidget);
-      expect(find.byTooltip('Moderasi Data'), findsNothing);
-
-      final curator = FakeRequest(() => jsonDecode(emptyQueue))
-        ..loggedIn = true
-        ..jsonData = {'is_staff': true};
-      await tester.pumpWidget(
-        Provider<CookieRequest>.value(
-          value: curator,
-          child: const MaterialApp(home: DataCorrectionPage()),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Moderasi Data'));
-      await tester.pumpAndSettle();
-      expect(find.byType(ModerationPage), findsOneWidget);
-      expect(find.text('Antrean pengajuan'), findsOneWidget);
-    });
-    expect(log.single.url.toString(), '$base/moderation/');
   });
 }

@@ -12,6 +12,7 @@ class FakeRequest implements CookieRequest {
   final Object? Function()? reply;
   final urls = <String>[];
   int initCalls = 0;
+  int logoutCalls = 0;
 
   @override
   Map<String, String> headers = {'cookie': 'sessionid=s;csrftoken=t'};
@@ -40,6 +41,15 @@ class FakeRequest implements CookieRequest {
   Future<dynamic> get(String url) {
     urls.add(url);
     return Future<dynamic>.microtask(reply!);
+  }
+
+  /// Seperti pbp_django_auth: hanya mengosongkan status di memori.
+  @override
+  Future<dynamic> logout(String url) async {
+    logoutCalls++;
+    loggedIn = false;
+    jsonData = {};
+    return {'status': true, 'message': 'Berhasil keluar.'};
   }
 
   @override

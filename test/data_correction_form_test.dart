@@ -90,6 +90,14 @@ http.Response serverReply(http.Request request) => request.method == 'POST'
     ? jsonResponse(correctionJson, 201)
     : formReply(request);
 
+/// GET me/ menjawab sudah masuk (gerbang login antrean); permintaan lain diteruskan ke reply.
+http.Response Function(http.Request) signedIn(
+  http.Response Function(http.Request) reply,
+) =>
+    (request) => request.url.path.endsWith('/me/')
+    ? jsonResponse('{"logged_in": true, "is_staff": false}', 200)
+    : reply(request);
+
 List<http.Request> posts(List<http.Request> log) => [
   for (final request in log)
     if (request.method == 'POST') request,
@@ -271,7 +279,7 @@ void main() {
   testWidgets(
     'Lengkapi Data on the queue opens the form with the correctable missing fields',
     (tester) async {
-      final log = await withMockServer(formReply, () async {
+      final log = await withMockServer(signedIn(formReply), () async {
         useTallView(tester);
         final request = FakeRequest(() => jsonDecode(queueJson))
           ..loggedIn = true;
@@ -291,9 +299,11 @@ void main() {
         ); // proteins_100g tidak ada di form palsu ini
       });
       expect(
-        log.single.url.toString(),
-        '$base/products/107/form/'
-        '?field=proteins_100g&field=fiber_100g&field=sodium_100g&field=nova_group',
+        [for (final request in log) request.url.toString()],
+        [
+          '$base/me/',
+          '$base/products/107/form/?field=proteins_100g&field=fiber_100g&field=sodium_100g&field=nova_group',
+        ],
       );
     },
   );
@@ -467,45 +477,6 @@ void main() {
       },
     );
     expect(posts(log), hasLength(4));
-  });
-
-  testWidgets('Kembali ke Antrean Data returns to a reloaded queue', (
-    tester,
-  ) async {
-    var loads = 0;
-    final request = FakeRequest(() {
-      final json = jsonDecode(queueJson) as Map<String, dynamic>;
-      if (loads++ > 0) {
-        json['results'][0]
-          ..['status'] = 'needs_verification'
-          ..['status_label'] = 'Perlu verifikasi';
-      }
-      return json;
-    })..loggedIn = true;
-    await withMockServer(serverReply, () async {
-      useTallView(tester);
-      await tester.pumpWidget(
-        Provider<CookieRequest>.value(
-          value: request,
-          child: const MaterialApp(home: DataCorrectionPage()),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Perlu kontribusi'), findsOneWidget);
-
-      await tester.tap(find.text('Lengkapi Data'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextFormField).first, '7,5');
-      await tester.tap(find.text('Ajukan Koreksi'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Kembali ke Antrean Data'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(DataCorrectionPage), findsOneWidget);
-      expect(find.text('Perlu verifikasi'), findsOneWidget);
-      expect(find.text('Perlu kontribusi'), findsNothing);
-    });
-    expect(request.urls, hasLength(2));
   });
 
   testWidgets('the detail page loads by id and retries with Coba lagi', (

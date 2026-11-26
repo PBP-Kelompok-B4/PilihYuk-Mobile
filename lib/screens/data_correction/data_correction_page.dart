@@ -6,6 +6,7 @@ import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_form_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/moderation_page.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/module_navigation.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/my_corrections_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/queue_widgets.dart';
 import 'package:pilihyuk_mobile/widgets/left_drawer.dart';
@@ -24,12 +25,24 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
   String? _missing; // null = semua jenis data
   int _page = 1;
   late Future<CorrectionQueue> _queue;
+  Viewer? _viewer; // hasil me/ terakhir; null = belum ada jawaban atau gagal
 
   // Future dibuat sekali di sini (Tutorial 10), bukan di build.
   @override
   void initState() {
     super.initState();
     _queue = _fetch();
+    _loadViewer();
+  }
+
+  /// Status login dan kurator dari GET me/ (KEPUTUSAN F.a), untuk tombol AppBar dan gerbang login.
+  Future<void> _loadViewer() async {
+    final viewer = await loadViewer(context.read<CookieRequest>());
+    if (mounted) {
+      setState(() {
+        _viewer = viewer;
+      });
+    }
   }
 
   Future<CorrectionQueue> _fetch() async {
@@ -53,6 +66,11 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
     return _queue.then<void>((_) {}, onError: (Object _) {});
   }
 
+  // Tarik-untuk-muat-ulang juga menanyakan me/ lagi.
+  Future<void> _refresh() async {
+    await Future.wait([_reload(), _loadViewer()]);
+  }
+
   // Chip dan tombol halaman memakai sort dan missing dari balasan terakhir.
   void _show({required String sort, String? missing, int page = 1}) {
     _sort = sort;
@@ -61,61 +79,87 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
     _reload();
   }
 
-  // Sementara memakai request.loggedIn; gerbang login lewat me/ dibuat di Tahap 16.
+  /// Gerbang login memakai hasil me/ terakhir. me/ yang gagal ditanyakan lagi saat tombol ditekan;
+  /// sesudah masuk lewat sheet, me/ dimuat ulang supaya tombol kurator ikut muncul.
+  Future<bool> _ensureLoggedIn() async {
+    if (_viewer == null) {
+      await _loadViewer();
+      if (!mounted) {
+        return false;
+      }
+    }
+    final wasLoggedIn = _viewer?.loggedIn ?? false;
+    final allowed = await ensureLoggedIn(context, viewer: _viewer);
+    if (allowed && !wasLoggedIn && mounted) {
+      await _loadViewer();
+    }
+    return allowed;
+  }
+
   // Form mengembalikan true setelah pengajuan terkirim, lalu antrean dimuat ulang.
   Future<void> _contribute(QueueProduct product) async {
-    if (!context.read<CookieRequest>().loggedIn) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Masuk dulu untuk mengajukan koreksi.')),
-        );
+    if (!await _ensureLoggedIn()) {
+      return;
+    }
+    if (!mounted) {
       return;
     }
     final focus = [
       for (final entry in product.missing)
         if (entry.correctable) ...entry.fields,
     ];
-    final submitted = await Navigator.push<bool>(
+    final submitted = await pushModulePage<bool>(
       context,
-      MaterialPageRoute(
-        builder: (_) => CorrectionFormPage(productId: product.id, focus: focus),
-      ),
+      'form',
+      CorrectionFormPage(productId: product.id, focus: focus),
     );
     if (submitted == true && mounted) {
       await _reload();
     }
   }
 
-  void _openMine() {
-    Navigator.push(
+  Future<void> _openMine() async {
+    if (!await _ensureLoggedIn()) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    final changed = await pushModulePage<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const MyCorrectionsPage()),
+      'saya',
+      const MyCorrectionsPage(),
     );
+    if (changed == true && mounted) {
+      await _reload();
+    }
   }
 
-  void _openModeration() {
-    Navigator.push(
+  // Tombolnya hanya tampil untuk kurator menurut me/; server tetap memeriksa lagi (403 forbidden).
+  Future<void> _openModeration() async {
+    final changed = await pushModulePage<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const ModerationPage()),
+      'moderasi',
+      const ModerationPage(),
     );
+    if (changed == true && mounted) {
+      await _reload();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Sementara memakai request.loggedIn dan jsonData hasil login; diganti hasil me/ di Tahap 16.
-    final request = context.watch<CookieRequest>();
     return Scaffold(
       appBar: AppBar(
         title: const Text('Antrean Data'),
         actions: [
-          if (request.loggedIn)
-            IconButton(
-              tooltip: 'Pengajuan Saya',
-              icon: const Icon(Icons.assignment_outlined),
-              onPressed: _openMine,
-            ),
-          if (request.loggedIn && request.jsonData['is_staff'] == true)
+          // Tamu juga melihat tombol ini; menekannya membuka sheet login.
+          IconButton(
+            tooltip: 'Pengajuan Saya',
+            icon: const Icon(Icons.history),
+            onPressed: _openMine,
+          ),
+          if (_viewer?.isStaff ?? false)
             IconButton(
               tooltip: 'Moderasi Data',
               icon: const Icon(Icons.admin_panel_settings_outlined),
@@ -125,7 +169,7 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
       ),
       drawer: const LeftDrawer(),
       body: RefreshIndicator(
-        onRefresh: _reload,
+        onRefresh: _refresh,
         child: FutureBuilder<CorrectionQueue>(
           future: _queue,
           builder: (context, snapshot) {

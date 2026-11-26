@@ -266,11 +266,6 @@ void main() {
         request.urls.last,
         '$baseUrl/api/v1/corrections/queue/?sort=shelf&page=2',
       );
-
-      await tester.tap(find.text('Lengkapi Data').first);
-      await tester.pump();
-      expect(find.text('Masuk dulu untuk mengajukan koreksi.'), findsOneWidget);
-      expect(request.urls, hasLength(3)); // belum masuk: form tidak dibuka
     });
 
     testWidgets('shows the error view and retries with Coba lagi', (

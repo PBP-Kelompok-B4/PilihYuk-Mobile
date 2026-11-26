@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/module_navigation.dart';
 
 /// Detail satu pengajuan milik sendiri. initial dipakai apa adanya (mis. balasan 201); tanpa initial,
 /// data dimuat dari GET mine/{id}/. justSubmitted menampilkan keadaan "Pengajuan berhasil dikirim".
@@ -213,7 +214,7 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
         if (submitted) ...[
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => backToQueue(context),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
               backgroundColor: CorrectionColors.primary,

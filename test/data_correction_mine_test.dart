@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_detail_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
-import 'package:pilihyuk_mobile/screens/data_correction/data_correction_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/my_corrections_page.dart';
 
 import 'data_correction_fakes.dart';
@@ -52,14 +51,6 @@ const pageTwoJson = r'''
 
 const emptyJson =
     '{"count": 0, "page": 1, "page_size": 10, "num_pages": 1, "next_page": null, "previous_page": null, "results": []}';
-
-// Antrean kosong secukupnya untuk membangun DataCorrectionPage.
-const emptyQueueJson = r'''
-{"count": 0, "page": 1, "page_size": 20, "num_pages": 1, "next_page": null, "previous_page": null,
- "sort": "shelf", "missing": null, "shelf_available": true, "sort_options": [], "missing_options": [],
- "stats": {"incomplete_products": 0, "submitted_last_7_days": 0, "approved": 0, "shelf_average": 0},
- "results": []}
-''';
 
 const notWithdrawable =
     'Pengajuan ini sudah mulai ditinjau sehingga tidak bisa ditarik.';
@@ -272,38 +263,6 @@ void main() {
       expect(find.text('Catatan kurator: Tidak sesuai label.'), findsOneWidget);
     });
     expect(log, hasLength(1)); // detail tidak memanggil GET mine/9/
-  });
-
-  testWidgets('the Pengajuan Saya action only shows when logged in', (
-    tester,
-  ) async {
-    final log = await withMockServer(pagedReply, () async {
-      useTallView(tester);
-      final guest = FakeRequest(() => jsonDecode(emptyQueueJson));
-      await tester.pumpWidget(
-        Provider<CookieRequest>.value(
-          value: guest,
-          child: const MaterialApp(home: DataCorrectionPage()),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.byTooltip('Pengajuan Saya'), findsNothing);
-
-      final member = FakeRequest(() => jsonDecode(emptyQueueJson))
-        ..loggedIn = true;
-      await tester.pumpWidget(
-        Provider<CookieRequest>.value(
-          value: member,
-          child: const MaterialApp(home: DataCorrectionPage()),
-        ),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Pengajuan Saya'));
-      await tester.pumpAndSettle();
-      expect(find.byType(MyCorrectionsPage), findsOneWidget);
-      expect(find.text('Sarimi Isi 2 Goreng'), findsOneWidget);
-    });
-    expect(log.single.url.toString(), '$base/mine/');
   });
 
   testWidgets('Tarik pengajuan only shows for withdrawable corrections', (

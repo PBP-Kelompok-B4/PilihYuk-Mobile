@@ -3,7 +3,7 @@ import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
 
 /// Pesan untuk 403 authentication_required (sesi habis).
-const sessionEndedMessage = 'Sesi berakhir, silakan masuk lagi.';
+const sessionEndedMessage = 'Sesi berakhir. Masuk lagi untuk melanjutkan.';
 const withdrawnMessage = 'Pengajuan berhasil ditarik.';
 
 /// Warna bersama halaman Antrean Data: token Figma (285:5593) dan warna khusus web.

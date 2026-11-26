@@ -65,6 +65,16 @@ Future<void> signOut(CookieRequest request) async {
   }
 }
 
+/// 403 authentication_required di tengah jalan (KEPUTUSAN F.a): logout lokal, lalu sheet login berpesan sesi
+/// habis di atas halaman yang sedang tampil. true bila pengguna sudah masuk lagi.
+Future<bool> handleSessionEnded(BuildContext context) async {
+  await signOut(context.read<CookieRequest>());
+  if (!context.mounted) {
+    return false;
+  }
+  return showLoginSheet(context, message: sessionEndedMessage);
+}
+
 /// Gerbang login (pola ensureLoggedIn Tutorial 10). viewer = hasil me/ terakhir; null (me/ gagal) memakai
 /// request.loggedIn. Belum masuk -> sheet login. true bila sudah masuk, termasuk setelah masuk lewat sheet.
 Future<bool> ensureLoggedIn(BuildContext context, {Viewer? viewer}) async {
@@ -101,17 +111,20 @@ Future<bool> showLoginSheet(
   );
 }
 
-/// KEPUTUSAN TAHAP 0 (c): LoginPage selalu pindah ke Katalog setelah berhasil. Jadi begitu halaman itu
-/// selesai dan pengguna sudah masuk, route di atas halaman pemanggil ditutup (popUntil).
+/// Membuka LoginPage atau RegisterPage, lalu kembali ke halaman yang tadi tampil. KEPUTUSAN TAHAP 0 (c):
+/// LoginPage mengganti dirinya dengan Katalog setelah berhasil (hasil null), jadi Katalog itu ditutup.
 Future<bool> _openAuthPage(BuildContext context, Widget page) async {
   final navigator = Navigator.of(context);
-  final here = ModalRoute.of(context);
   final request = context.read<CookieRequest>();
-  await navigator.push(MaterialPageRoute<void>(builder: (_) => page));
+  final result = await navigator.push<Object?>(
+    MaterialPageRoute<Object?>(builder: (_) => page),
+  );
   if (!request.loggedIn) {
     return false;
   }
-  navigator.popUntil((route) => route == here || route.isFirst);
+  if (result == null) {
+    navigator.pop();
+  }
   return true;
 }
 

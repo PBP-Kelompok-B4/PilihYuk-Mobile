@@ -21,6 +21,42 @@ Future<({int status, dynamic data})> getJson(
   );
 }
 
+/// Penghubung CorrectionApi dengan halaman antrean yang sedang terbuka, satu per CookieRequest. Antrean ada di
+/// bawah semua halaman modul, jadi ia yang menampilkan sheet login saat sesi habis. changed menandai tulis
+/// yang berhasil (kirim, tarik, tinjau), supaya antrean dimuat ulang saat pengguna kembali.
+class ModuleSession {
+  ModuleSession(this._onSessionEnded);
+
+  static final _sessions = <CookieRequest, ModuleSession>{};
+
+  static ModuleSession? of(CookieRequest request) => _sessions[request];
+
+  final Future<bool> Function() _onSessionEnded;
+  Future<bool>? _pending;
+  bool changed = false;
+
+  void attach(CookieRequest request) {
+    _sessions[request] = this;
+  }
+
+  void detach(CookieRequest request) {
+    if (_sessions[request] == this) {
+      _sessions.remove(request);
+    }
+  }
+
+  /// Beberapa permintaan yang kena 403 bersamaan berbagi satu sheet. true = pengguna sudah masuk lagi.
+  Future<bool> sessionEnded() =>
+      _pending ??= _onSessionEnded().whenComplete(() => _pending = null);
+
+  /// true sekali setelah ada perubahan, lalu kembali false.
+  bool takeChanges() {
+    final result = changed;
+    changed = false;
+    return result;
+  }
+}
+
 /// Semua panggilan /api/v1/corrections/ selain antrean publik. Sukses (2xx) -> model; selain itu ApiError
 /// (status 0 untuk galat jaringan atau balasan yang bukan JSON).
 class CorrectionApi {
@@ -57,8 +93,13 @@ class CorrectionApi {
   Future<Correction> detail(int id) =>
       _get(_uri('mine/$id/'), Correction.fromJson);
 
-  Future<void> withdraw(int id) =>
-      _call(sendJson(request, 'DELETE', _uri('mine/$id/').toString()), (_) {});
+  Future<void> withdraw(int id) async {
+    await _call(
+      () => sendJson(request, 'DELETE', _uri('mine/$id/').toString()),
+      (_) {},
+    );
+    _markChanged();
+  }
 
   Future<ModerationQueue> moderation({
     String? tab,
@@ -94,25 +135,52 @@ class CorrectionApi {
       Uri.parse('$baseUrl/api/v1/corrections/$path')
           .replace(queryParameters: query.isEmpty ? null : query);
 
-  Future<T> _get<T>(Uri uri, T Function(Map<String, dynamic>) parse) =>
-      _call(getJson(request, uri.toString()), (data) => parse(_object(data)));
+  Future<T> _get<T>(Uri uri, T Function(Map<String, dynamic>) parse) => _call(
+    () => getJson(request, uri.toString()),
+    (data) => parse(_object(data)),
+  );
 
   Future<T> _write<T>(
     String method,
     Uri uri,
     T Function(Map<String, dynamic>) parse,
     Object body,
-  ) => _call(
-    sendJson(request, method, uri.toString(), body),
-    (data) => parse(_object(data)),
-  );
+  ) async {
+    final result = await _call(
+      () => sendJson(request, method, uri.toString(), body),
+      (data) => parse(_object(data)),
+    );
+    _markChanged();
+    return result;
+  }
 
+  void _markChanged() => ModuleSession.of(request)?.changed = true;
+
+  /// 403 authentication_required di tengah jalan: antrean menampilkan sheet login, lalu permintaan diulang
+  /// sekali bila pengguna sudah masuk lagi. Tanpa antrean (mis. di tes satu halaman), galat diteruskan.
   Future<T> _call<T>(
-    Future<({int status, dynamic data})> pending,
+    Future<({int status, dynamic data})> Function() send,
     T Function(Object? data) parse,
   ) async {
     try {
-      final response = await pending.timeout(timeout);
+      return await _send(send, parse);
+    } on ApiError catch (error) {
+      final session = ModuleSession.of(request);
+      if (!error.needsLogin ||
+          session == null ||
+          !await session.sessionEnded()) {
+        rethrow;
+      }
+      return _send(send, parse);
+    }
+  }
+
+  Future<T> _send<T>(
+    Future<({int status, dynamic data})> Function() send,
+    T Function(Object? data) parse,
+  ) async {
+    try {
+      final response = await send().timeout(timeout);
       if (response.status < 200 || response.status > 299) {
         throw ApiError.fromResponse(response.status, response.data);
       }

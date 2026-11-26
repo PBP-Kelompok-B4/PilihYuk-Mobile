@@ -16,7 +16,7 @@ class QueueStatsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cards = [
-      _StatCard(
+      StatCard(
         icon: Icons.inbox_outlined,
         background: CorrectionColors.accentSoft,
         foreground: CorrectionColors.accentText,
@@ -24,7 +24,7 @@ class QueueStatsGrid extends StatelessWidget {
         title: 'Menunggu kontribusi',
         caption: 'produk dengan data kosong',
       ),
-      _StatCard(
+      StatCard(
         icon: Icons.calendar_today_outlined,
         background: CorrectionColors.secondary,
         foreground: Colors.black87,
@@ -32,7 +32,7 @@ class QueueStatsGrid extends StatelessWidget {
         title: 'Diajukan minggu ini',
         caption: 'pengajuan 7 hari terakhir',
       ),
-      _StatCard(
+      StatCard(
         icon: Icons.check_circle_outline,
         background: CorrectionColors.soft,
         foreground: CorrectionColors.primary,
@@ -40,7 +40,7 @@ class QueueStatsGrid extends StatelessWidget {
         title: 'Disetujui',
         caption: 'data berhasil dilengkapi',
       ),
-      _StatCard(
+      StatCard(
         icon: Icons.layers_outlined,
         background: CorrectionColors.leaf,
         foreground: CorrectionColors.primary,
@@ -72,8 +72,10 @@ class QueueStatsGrid extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
+/// Kartu statistik: ikon dalam lingkaran, angka, judul, dan keterangan (juga dipakai Moderasi Data).
+class StatCard extends StatelessWidget {
+  const StatCard({
+    super.key,
     required this.icon,
     required this.background,
     required this.foreground,

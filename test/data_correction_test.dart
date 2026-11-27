@@ -8,6 +8,8 @@ import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/data_correction_page.dart';
 
+import 'data_correction_fakes.dart';
+
 // Respons asli GET /api/v1/corrections/queue/ dari db.sqlite3 seed (results dipotong jadi 2).
 const sampleJson = r'''
 {"count": 347, "page": 1, "page_size": 20, "num_pages": 18, "next_page": 2, "previous_page": null,
@@ -43,24 +45,6 @@ const sampleJson = r'''
 
 Map<String, dynamic> sample() => jsonDecode(sampleJson) as Map<String, dynamic>;
 
-/// CookieRequest palsu: get() mencatat URL lalu mengembalikan reply() (atau galat yang dilemparnya).
-class FakeRequest implements CookieRequest {
-  FakeRequest(this.reply);
-
-  final Object? Function() reply;
-  final urls = <String>[];
-
-  @override
-  dynamic noSuchMethod(Invocation invocation) {
-    if (invocation.memberName == #get) {
-      urls.add(invocation.positionalArguments.first as String);
-      return Future<dynamic>.microtask(reply);
-    }
-    if (invocation.memberName == #loggedIn) return false;
-    return super.noSuchMethod(invocation);
-  }
-}
-
 /// Tanpa gambar, supaya tes tidak mengunduh dari jaringan.
 Map<String, dynamic> sampleWithoutImages() {
   final json = sample();
@@ -70,16 +54,31 @@ Map<String, dynamic> sampleWithoutImages() {
   return json;
 }
 
-Future<FakeRequest> pumpPage(WidgetTester tester, Object? Function() reply) async {
-  // Layar tinggi, supaya semua kartu dan tombol halaman langsung dibangun ListView.
-  tester.view.physicalSize = const Size(1000, 6000);
+/// Bawaannya layar tinggi, supaya semua kartu dan tombol halaman langsung dibangun ListView.
+/// size dan textScale untuk memeriksa layar sempit dengan huruf besar.
+Future<FakeRequest> pumpPage(
+  WidgetTester tester,
+  Object? Function() reply, {
+  Size size = const Size(1000, 6000),
+  double textScale = 1,
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   final request = FakeRequest(reply);
-  await tester.pumpWidget(Provider<CookieRequest>.value(
-    value: request,
-    child: const MaterialApp(home: DataCorrectionPage()),
-  ));
+  await tester.pumpWidget(
+    Provider<CookieRequest>.value(
+      value: request,
+      child: MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: const DataCorrectionPage(),
+      ),
+    ),
+  );
   await tester.pump();
   await tester.pump();
   return request;
@@ -89,23 +88,59 @@ void main() {
   group('CorrectionQueue.fromJson', () {
     test('reads a full response', () {
       final queue = CorrectionQueue.fromJson(sample());
-      expect([queue.count, queue.page, queue.pageSize, queue.numPages, queue.nextPage, queue.previousPage],
-          [347, 1, 20, 18, 2, null]);
-      expect([queue.sort, queue.missing, queue.shelfAvailable], ['shelf', null, true]);
-      expect([for (final option in queue.sortOptions) option.key], ['shelf', 'kosong', 'terbaru']);
-      expect([for (final option in queue.missingOptions) option.label],
-          ['Gizi', 'NOVA', 'Merek', 'Isi bersih', 'Asal']);
-      expect([queue.stats.incompleteProducts, queue.stats.submittedLast7Days, queue.stats.approved],
-          [347, 0, 5]);
+      expect(
+        [
+          queue.count,
+          queue.page,
+          queue.pageSize,
+          queue.numPages,
+          queue.nextPage,
+          queue.previousPage,
+        ],
+        [347, 1, 20, 18, 2, null],
+      );
+      expect(
+        [queue.sort, queue.missing, queue.shelfAvailable],
+        ['shelf', null, true],
+      );
+      expect(
+        [for (final option in queue.sortOptions) option.key],
+        ['shelf', 'kosong', 'terbaru'],
+      );
+      expect(
+        [for (final option in queue.missingOptions) option.label],
+        ['Gizi', 'NOVA', 'Merek', 'Isi bersih', 'Asal'],
+      );
+      expect(
+        [
+          queue.stats.incompleteProducts,
+          queue.stats.submittedLast7Days,
+          queue.stats.approved,
+        ],
+        [347, 0, 5],
+      );
       expect(queue.stats.shelfAverage, 0.1);
 
       final first = queue.results.first;
-      expect([first.id, first.productName, first.brand, first.quantity, first.subtitle],
-          [107, 'BLUE BAND CAKE & COOKIE', '', '', '']);
+      expect(
+        [
+          first.id,
+          first.productName,
+          first.brand,
+          first.quantity,
+          first.subtitle,
+        ],
+        [107, 'BLUE BAND CAKE & COOKIE', '', '', ''],
+      );
       expect(first.imageUrl, startsWith('https://images.openfoodfacts.org/'));
-      expect([first.missingCount, first.shelfCount, first.status, first.statusLabel],
-          [11, 5, 'needs_verification', 'Perlu verifikasi']);
-      expect([for (final entry in first.missing) entry.key], ['nutrition', 'nova', 'brand', 'quantity', 'origin']);
+      expect(
+        [first.missingCount, first.shelfCount, first.status, first.statusLabel],
+        [11, 5, 'needs_verification', 'Perlu verifikasi'],
+      );
+      expect(
+        [for (final entry in first.missing) entry.key],
+        ['nutrition', 'nova', 'brand', 'quantity', 'origin'],
+      );
       expect(first.missing.first.correctable, isTrue);
       expect(first.missing.first.fields, hasLength(7));
       expect(first.missing[1].fields, ['nova_group']);
@@ -125,15 +160,34 @@ void main() {
       row['brand'] = 'Blue Band';
       row['quantity'] = '200 g';
       row['missing'] = [
-        {'key': 'packaging', 'label': 'Kemasan', 'correctable': false, 'fields': <String>[]},
+        {
+          'key': 'packaging',
+          'label': 'Kemasan',
+          'correctable': false,
+          'fields': <String>[],
+        },
       ];
 
       final queue = CorrectionQueue.fromJson(json);
-      expect([queue.missing, queue.nextPage, queue.previousPage, queue.shelfAvailable], ['nova', null, 17, false]);
+      expect(
+        [
+          queue.missing,
+          queue.nextPage,
+          queue.previousPage,
+          queue.shelfAvailable,
+        ],
+        ['nova', null, 17, false],
+      );
       expect(queue.stats.shelfAverage, isNull);
       final first = queue.results.first;
-      expect([first.shelfCount, first.imageUrl, first.subtitle], [null, '', 'Blue Band · 200 g']);
-      expect([first.missing.single.correctable, first.missing.single.fields], [false, isEmpty]);
+      expect(
+        [first.shelfCount, first.imageUrl, first.subtitle],
+        [null, '', 'Blue Band · 200 g'],
+      );
+      expect(
+        [first.missing.single.correctable, first.missing.single.fields],
+        [false, isEmpty],
+      );
     });
 
     test('shelf_average 0 from an empty queue is a double', () {
@@ -145,17 +199,39 @@ void main() {
 
   test('CorrectionQueue.uri leaves out null values and page 1', () {
     const base = 'http://127.0.0.1:8000';
-    expect(CorrectionQueue.uri(base).toString(), '$base/api/v1/corrections/queue/');
-    expect(CorrectionQueue.uri(base, sort: 'terbaru', missing: 'nova', page: 2).toString(),
-        '$base/api/v1/corrections/queue/?sort=terbaru&missing=nova&page=2');
-    expect(CorrectionQueue.uri(base, sort: 'kosong', page: 1).toString(),
-        '$base/api/v1/corrections/queue/?sort=kosong');
+    expect(
+      CorrectionQueue.uri(base).toString(),
+      '$base/api/v1/corrections/queue/',
+    );
+    expect(
+      CorrectionQueue.uri(
+        base,
+        sort: 'terbaru',
+        missing: 'nova',
+        page: 2,
+      ).toString(),
+      '$base/api/v1/corrections/queue/?sort=terbaru&missing=nova&page=2',
+    );
+    expect(
+      CorrectionQueue.uri(base, sort: 'kosong', page: 1).toString(),
+      '$base/api/v1/corrections/queue/?sort=kosong',
+    );
   });
 
   test('number formats follow the website', () {
-    expect([formatThousands(0), formatThousands(347), formatThousands(1248), formatThousands(1234567)],
-        ['0', '347', '1.248', '1.234.567']);
-    expect([formatTimes(0.1), formatTimes(9.0), formatTimes(0), formatTimes(null)], ['0,1×', '9×', '0×', '—']);
+    expect(
+      [
+        formatThousands(0),
+        formatThousands(347),
+        formatThousands(1248),
+        formatThousands(1234567),
+      ],
+      ['0', '347', '1.248', '1.234.567'],
+    );
+    expect(
+      [formatTimes(0.1), formatTimes(9.0), formatTimes(0), formatTimes(null)],
+      ['0,1×', '9×', '0×', '—'],
+    );
   });
 
   group('DataCorrectionPage', () {
@@ -164,12 +240,20 @@ void main() {
 
       expect(request.urls, ['$baseUrl/api/v1/corrections/queue/']);
       expect(find.widgetWithText(AppBar, 'Antrean Data'), findsOneWidget);
-      for (final label in ['Menunggu kontribusi', 'Diajukan minggu ini', 'Disetujui', 'Rata-rata di shelf']) {
+      for (final label in [
+        'Menunggu kontribusi',
+        'Diajukan minggu ini',
+        'Disetujui',
+        'Rata-rata di shelf',
+      ]) {
         expect(find.text(label), findsOneWidget);
       }
       expect(find.text('347'), findsOneWidget);
       expect(find.text('0,1×'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Paling sering di shelf'), findsOneWidget);
+      expect(
+        find.widgetWithText(ChoiceChip, 'Paling sering di shelf'),
+        findsOneWidget,
+      );
       expect(find.widgetWithText(ChoiceChip, 'Semua'), findsOneWidget);
       expect(find.text('BLUE BAND CAKE & COOKIE'), findsOneWidget);
       expect(find.text('Ada di 5 shelf'), findsNWidgets(2));
@@ -180,35 +264,118 @@ void main() {
       await tester.tap(find.widgetWithText(ChoiceChip, 'NOVA'));
       await tester.pump();
       await tester.pump();
-      expect(request.urls.last, '$baseUrl/api/v1/corrections/queue/?sort=shelf&missing=nova');
+      expect(
+        request.urls.last,
+        '$baseUrl/api/v1/corrections/queue/?sort=shelf&missing=nova',
+      );
 
       await tester.tap(find.text('Berikutnya'));
       await tester.pump();
       await tester.pump();
-      expect(request.urls.last, '$baseUrl/api/v1/corrections/queue/?sort=shelf&page=2');
-
-      await tester.tap(find.text('Lengkapi Data').first);
-      await tester.pump();
-      expect(find.text('Segera hadir'), findsOneWidget);
-      expect(request.urls, hasLength(3)); // tombol ajukan belum memanggil endpoint
+      expect(
+        request.urls.last,
+        '$baseUrl/api/v1/corrections/queue/?sort=shelf&page=2',
+      );
     });
 
-    testWidgets('shows the error message when loading fails', (tester) async {
-      await pumpPage(tester, () => throw const FormatException('400'));
+    testWidgets('shows the error view and retries with Coba lagi', (
+      tester,
+    ) async {
+      var calls = 0;
+      final request = await pumpPage(tester, () {
+        calls++;
+        if (calls == 1) throw const FormatException('400');
+        return sampleWithoutImages();
+      });
       expect(find.widgetWithText(AppBar, 'Antrean Data'), findsOneWidget);
-      expect(find.text('Gagal memuat antrean. Tarik ke bawah untuk mencoba lagi.'), findsOneWidget);
+      expect(find.text('Gagal memuat antrean.'), findsOneWidget);
+
+      await tester.tap(find.text('Coba lagi'));
+      await tester.pump();
+      await tester.pump();
+      expect(request.urls, hasLength(2));
+      expect(find.text('Gagal memuat antrean.'), findsNothing);
+      expect(find.text('BLUE BAND CAKE & COOKIE'), findsOneWidget);
     });
 
     testWidgets('shows the empty state without a filter', (tester) async {
       await pumpPage(tester, () => emptySample(null));
       expect(find.text('Semua data produk sudah lengkap.'), findsOneWidget);
+      expect(
+        find.text(
+          'Terima kasih! Saat ini tidak ada produk aktif yang datanya kosong.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Bersihkan filter'), findsNothing);
       expect(find.textContaining('Halaman'), findsNothing);
     });
 
     testWidgets('shows the empty state for a filter', (tester) async {
       await pumpPage(tester, () => emptySample('nova'));
-      expect(find.text('Tidak ada produk yang kekurangan data jenis ini.'), findsOneWidget);
-      expect(find.widgetWithText(ChoiceChip, 'Semua'), findsOneWidget); // filter masih bisa dihapus
+      expect(find.text('Tidak ada produk yang cocok.'), findsOneWidget);
+      expect(
+        find.text(
+          'Tidak ada produk yang kekurangan data jenis ini. Coba jenis data lain.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Bersihkan filter'), findsOneWidget);
+      expect(
+        find.widgetWithText(ChoiceChip, 'Semua'),
+        findsOneWidget,
+      ); // filter masih bisa dihapus lewat chip
+    });
+
+    testWidgets(
+      'Bersihkan filter reloads without the filter and keeps the sort',
+      (tester) async {
+        var calls = 0;
+        final request = await pumpPage(tester, () {
+          calls++;
+          return calls == 1
+              ? (emptySample('nova')..['sort'] = 'terbaru')
+              : sampleWithoutImages();
+        });
+
+        await tester.tap(find.text('Bersihkan filter'));
+        await tester.pump();
+        await tester.pump();
+        expect(request.urls, [
+          '$baseUrl/api/v1/corrections/queue/',
+          '$baseUrl/api/v1/corrections/queue/?sort=terbaru',
+        ]);
+        expect(find.text('Bersihkan filter'), findsNothing);
+        expect(find.text('BLUE BAND CAKE & COOKIE'), findsOneWidget);
+      },
+    );
+
+    testWidgets('fits a 360 dp screen with large text', (tester) async {
+      // Nama, merek, dan isi panjang supaya kartu produk terisi penuh.
+      Map<String, dynamic> longNames() {
+        final json = sampleWithoutImages();
+        json['results'][0]
+          ..['product_name'] = 'Biskuit Gandum Utuh Rasa Cokelat Kacang Almond Ekstra Renyah Kemasan Keluarga'
+          ..['brand'] = 'Merek Biskuit Nusantara Sejahtera'
+          ..['quantity'] = '1,25 kg';
+        return json;
+      }
+
+      var calls = 0;
+      await pumpPage(
+        tester,
+        () => ++calls == 1 ? longNames() : emptySample('nova'),
+        size: const Size(360, 3000),
+        textScale: 1.3,
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Halaman 1 dari 18'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'NOVA'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Bersihkan filter'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

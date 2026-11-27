@@ -7,6 +7,9 @@ import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart'
 
 const noteRequiredMessage = 'Tulis alasan penolakan untuk pengaju.';
 
+/// Lebar minimal satu kotak nilai pada ukuran huruf normal.
+const _valueBoxWidth = 123.0;
+
 /// Review satu item koreksi: GET moderation/items/{id}/ (nilai produk selalu segar), lalu PATCH approved atau
 /// rejected. Ditutup dengan true bila status item berubah, supaya antrean moderasi dimuat ulang.
 class ReviewPage extends StatefulWidget {
@@ -46,12 +49,6 @@ class _ReviewPageState extends State<ReviewPage> {
     });
   }
 
-  void _toast(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
   /// Tolak: catatan wajib (dicek di sini dulu), lalu konfirmasi seperti dialog web.
   Future<void> _reject(ModerationRow row) async {
     if (_note.text.trim().isEmpty) {
@@ -89,7 +86,7 @@ class _ReviewPageState extends State<ReviewPage> {
       if (!mounted) {
         return;
       }
-      _toast(result.message);
+      showToast(context, result.message);
       Navigator.pop(context, true);
     } on ApiError catch (error) {
       if (!mounted) {
@@ -102,7 +99,11 @@ class _ReviewPageState extends State<ReviewPage> {
       if (_noteError != null) {
         return;
       }
-      _toast(error.needsLogin ? sessionEndedMessage : error.message);
+      showToast(
+        context,
+        error.needsLogin ? sessionEndedMessage : error.message,
+        success: false,
+      );
       if (error.code == 'already_reviewed' || error.status == 404) {
         Navigator.pop(context, true);
       } else if (error.status == 409) {
@@ -119,13 +120,13 @@ class _ReviewPageState extends State<ReviewPage> {
         future: _item,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const LoadingView();
           }
           final error = snapshot.error;
           if (error is ApiError &&
               (error.status == 403 || error.status == 404)) {
             return ListView(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(CorrectionSizes.inset),
               children: [
                 EmptyState(
                   icon: error.status == 403
@@ -154,15 +155,11 @@ class _ReviewPageState extends State<ReviewPage> {
     final product = row.product;
     final busy = _sending != null;
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(CorrectionSizes.inset),
       children: [
         Container(
           padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: CorrectionColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: CorrectionColors.border),
-          ),
+          decoration: CorrectionDecorations.card,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -173,49 +170,29 @@ class _ReviewPageState extends State<ReviewPage> {
                   label: row.statusLabel,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: CorrectionSizes.gapSm),
               Text(
                 'Sumber: ${row.submittedBy} · ${formatAgo(row.createdAt)}',
-                style: const TextStyle(
-                  color: CorrectionColors.ink,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: CorrectionText.value,
               ),
               Text(
                 'Pengajuan #${row.correctionId} · diajukan ${formatDate(row.createdAt)}',
-                style: const TextStyle(
-                  color: CorrectionColors.muted,
-                  fontSize: 12,
-                ),
+                style: CorrectionText.caption,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: CorrectionSizes.gapMd),
               Container(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: CorrectionColors.secondary,
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                decoration: CorrectionDecorations.field,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      product.displayName,
-                      style: const TextStyle(
-                        color: CorrectionColors.ink,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    Text(product.displayName, style: CorrectionText.itemTitle),
                     Text(
                       [
                         product.subtitle,
                         'Field: ${row.label}',
                       ].where((part) => part.isNotEmpty).join(' · '),
-                      style: const TextStyle(
-                        color: CorrectionColors.muted,
-                        fontSize: 12,
-                      ),
+                      style: CorrectionText.caption,
                     ),
                     if (!product.isActive) ...[
                       const SizedBox(height: 4),
@@ -231,46 +208,17 @@ class _ReviewPageState extends State<ReviewPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(
-                      child: _ValueBox(
-                        label: 'Nilai saat ini',
-                        value: displayOrUnknown(row.currentDisplay),
-                        background: CorrectionColors.secondary,
-                        labelColor: CorrectionColors.muted,
-                        valueColor: CorrectionColors.ink,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ValueBox(
-                        label: 'Usulan nilai',
-                        value: displayOrUnknown(row.proposedDisplay),
-                        background: CorrectionColors.soft,
-                        labelColor: CorrectionColors.primary,
-                        valueColor: CorrectionColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: CorrectionSizes.gapSm),
+              _values(row),
               if (row.stale) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: CorrectionSizes.gapSm),
                 _StaleWarning(old: displayOrUnknown(row.oldDisplay)),
               ],
-              const SizedBox(height: 16),
+              const SizedBox(height: CorrectionSizes.gapMd),
               if (row.isPending) ...[
                 const Text(
                   'Catatan untuk pengaju',
-                  style: TextStyle(
-                    color: CorrectionColors.ink,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: CorrectionText.label,
                 ),
                 const SizedBox(height: 6),
                 TextFormField(
@@ -285,16 +233,9 @@ class _ReviewPageState extends State<ReviewPage> {
                       });
                     }
                   },
-                  decoration: InputDecoration(
-                    helperText: 'Wajib diisi saat menolak, opsional saat menyetujui. Catatan terlihat oleh pengaju.',
-                    helperMaxLines: 3,
-                    errorText: _noteError,
-                    errorMaxLines: 3,
-                    filled: true,
-                    fillColor: CorrectionColors.surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                  decoration: CorrectionInputs.decoration(
+                    helper: 'Wajib diisi saat menolak, opsional saat menyetujui. Catatan terlihat oleh pengaju.',
+                    error: _noteError,
                   ),
                 ),
               ] else
@@ -303,22 +244,21 @@ class _ReviewPageState extends State<ReviewPage> {
                     horizontal: 14,
                     vertical: 12,
                   ),
-                  decoration: BoxDecoration(
-                    color: CorrectionColors.secondary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+                  decoration: CorrectionDecorations.field,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
                         'Item ini sudah ditinjau (${row.statusLabel.toLowerCase()}).',
-                        style: const TextStyle(
-                          color: CorrectionColors.ink,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: CorrectionText.value,
                       ),
                       if (row.reviewNote.isNotEmpty)
-                        Text('Catatan kurator: ${row.reviewNote}'),
+                        Text(
+                          'Catatan kurator: ${row.reviewNote}',
+                          style: CorrectionText.meta.copyWith(
+                            color: CorrectionColors.ink2,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -326,7 +266,7 @@ class _ReviewPageState extends State<ReviewPage> {
           ),
         ),
         if (row.isPending) ...[
-          const SizedBox(height: 20),
+          const SizedBox(height: CorrectionSizes.gapLg),
           if (product.isActive) ...[
             _ActionButton(
               label: 'Setujui',
@@ -337,7 +277,7 @@ class _ReviewPageState extends State<ReviewPage> {
                   ? null
                   : () => _send(row, CorrectionStatus.approved),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: CorrectionSizes.gapSm),
           ],
           _ActionButton(
             label: 'Tolak',
@@ -347,23 +287,73 @@ class _ReviewPageState extends State<ReviewPage> {
             onPressed: busy ? null : () => _reject(row),
           ),
           if (!product.isActive) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: CorrectionSizes.gapXs),
             const Text(
               'Usulan untuk produk nonaktif hanya bisa ditolak.',
-              style: TextStyle(color: CorrectionColors.muted, fontSize: 12),
+              style: CorrectionText.caption,
             ),
           ],
         ],
-        const SizedBox(height: 8),
+        const SizedBox(height: CorrectionSizes.gapXs),
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             onPressed: busy ? null : () => Navigator.maybePop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: CorrectionColors.ink,
+              minimumSize: const Size(0, CorrectionSizes.touchTarget),
+            ),
             icon: const Icon(Icons.arrow_back),
             label: const Text('Kembali ke antrean'),
           ),
         ),
       ],
+    );
+  }
+
+  /// Nilai saat ini dan usulan berdampingan seperti panel review web. Di layar sempit atau huruf besar
+  /// keduanya disusun ke bawah, supaya "Tidak diketahui" dan angka panjang tidak terpotong.
+  Widget _values(ModerationRow row) {
+    final current = _ValueBox(
+      label: 'Nilai saat ini',
+      value: displayOrUnknown(row.currentDisplay),
+      background: CorrectionColors.secondary,
+      labelColor: CorrectionColors.muted,
+      valueColor: CorrectionColors.ink,
+    );
+    final proposed = _ValueBox(
+      label: 'Usulan nilai',
+      value: displayOrUnknown(row.proposedDisplay),
+      background: CorrectionColors.soft,
+      labelColor: CorrectionColors.primary,
+      valueColor: CorrectionColors.primary,
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Faktor ukuran huruf pada teks 18 px (nilai di kotak); 1,0 pada ukuran normal.
+        final scale = MediaQuery.textScalerOf(context).scale(18) / 18;
+        final rowWidth = (2 * _valueBoxWidth + CorrectionSizes.gapSm) * scale;
+        if (constraints.maxWidth < rowWidth) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              current,
+              const SizedBox(height: CorrectionSizes.gapSm),
+              proposed,
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: current),
+              const SizedBox(width: CorrectionSizes.gapSm),
+              Expanded(child: proposed),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -389,20 +379,19 @@ class _ValueBox extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: CorrectionSizes.controlRadius,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: labelColor, fontSize: 12)),
+          Text(
+            label,
+            style: CorrectionText.caption.copyWith(color: labelColor),
+          ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: TextStyle(
-              color: valueColor,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
+            style: CorrectionText.cardTitle.copyWith(color: valueColor),
           ),
         ],
       ),
@@ -419,9 +408,9 @@ class _StaleWarning extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: CorrectionColors.warningSoft,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: CorrectionSizes.controlRadius,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,14 +456,7 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilledButton.icon(
       onPressed: onPressed,
-      style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: color.withValues(alpha: 0.45),
-        disabledForegroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+      style: CorrectionButtons.primary(background: color),
       icon: busy
           ? const SizedBox.square(
               dimension: 18,

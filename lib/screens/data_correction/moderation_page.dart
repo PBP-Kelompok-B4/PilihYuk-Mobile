@@ -7,6 +7,9 @@ import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart'
 import 'package:pilihyuk_mobile/screens/data_correction/queue_widgets.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/review_page.dart';
 
+/// Lebar minimal satu kartu statistik pada ukuran huruf normal.
+const _statWidth = 96.0;
+
 /// Moderasi Data untuk kurator. Tab antrean dan semua: item per field dari GET moderation/ (20 per halaman);
 /// tab panduan: GET moderation/guide/. Isinya sama dengan /moderasi/ di web.
 class ModerationPage extends StatefulWidget {
@@ -113,7 +116,7 @@ class _ModerationPageState extends State<ModerationPage> {
           builder: (context, snapshot) {
             final loading = snapshot.connectionState != ConnectionState.done;
             if (loading && !snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const LoadingView();
             }
             final error = snapshot.error;
             if (error is ApiError && error.status == 403) {
@@ -138,7 +141,7 @@ class _ModerationPageState extends State<ModerationPage> {
   Widget _forbidden(ApiError error) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(CorrectionSizes.inset),
       children: [
         EmptyState(
           icon: Icons.lock_outline,
@@ -154,25 +157,26 @@ class _ModerationPageState extends State<ModerationPage> {
   Widget _pageView(ModerationQueue queue, bool loading) {
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(CorrectionSizes.inset),
       children: [
-        if (loading) const LinearProgressIndicator(),
+        if (loading)
+          const LinearProgressIndicator(color: CorrectionColors.primary),
         const Text(
           'Tinjau koreksi data produk hasil kontribusi pengguna. Setujui atau tolak per field.',
-          style: TextStyle(color: CorrectionColors.muted, fontSize: 15),
+          style: CorrectionText.bodyMuted,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: CorrectionSizes.gapMd),
         _stats(queue.stats),
-        const SizedBox(height: 16),
+        const SizedBox(height: CorrectionSizes.gapMd),
         Wrap(
-          spacing: 8,
-          runSpacing: 4,
+          spacing: CorrectionSizes.gapXs,
+          runSpacing: CorrectionSizes.gapXs,
           children: [
             for (final option in queue.tabOptions)
-              ChoiceChip(
-                label: Text(option.label),
+              FilterChoice(
+                label: option.label,
                 selected: option.key == _tab,
-                onSelected: (_) {
+                onSelected: () {
                   if (option.key != _tab) {
                     _selectTab(option.key);
                   }
@@ -180,7 +184,7 @@ class _ModerationPageState extends State<ModerationPage> {
               ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: CorrectionSizes.gapLg),
         if (_tab == ModerationQueue.panduan)
           _guideView()
         else
@@ -189,110 +193,128 @@ class _ModerationPageState extends State<ModerationPage> {
     );
   }
 
+  /// Tiga kartu sebaris seperti web. Di layar sempit atau huruf besar kartu disusun ke bawah, supaya kata
+  /// seperti "Disetujui" tidak terpotong di tengah.
   Widget _stats(ModerationStats stats) {
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: StatCard(
-              icon: Icons.schedule,
-              background: CorrectionColors.secondary,
-              foreground: CorrectionColors.ink,
-              value: formatThousands(stats.pending),
-              title: 'Menunggu review',
-              caption: 'item koreksi',
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: StatCard(
-              icon: Icons.check_circle_outline,
-              background: CorrectionColors.soft,
-              foreground: CorrectionColors.primary,
-              value: formatThousands(stats.approved),
-              title: 'Disetujui',
-              caption: 'total item',
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: StatCard(
-              icon: Icons.cancel_outlined,
-              background: CorrectionColors.rejectedSoft,
-              foreground: CorrectionColors.rejectedText,
-              value: formatThousands(stats.rejected),
-              title: 'Ditolak',
-              caption: 'total item',
-            ),
-          ),
-        ],
+    final cards = [
+      StatCard(
+        icon: Icons.schedule,
+        background: CorrectionColors.secondary,
+        foreground: CorrectionColors.ink,
+        value: formatThousands(stats.pending),
+        title: 'Menunggu review',
+        caption: 'item koreksi',
       ),
+      StatCard(
+        icon: Icons.check_circle_outline,
+        background: CorrectionColors.soft,
+        foreground: CorrectionColors.primary,
+        value: formatThousands(stats.approved),
+        title: 'Disetujui',
+        caption: 'total item',
+      ),
+      StatCard(
+        icon: Icons.cancel_outlined,
+        background: CorrectionColors.rejectedSoft,
+        foreground: CorrectionColors.rejectedText,
+        value: formatThousands(stats.rejected),
+        title: 'Ditolak',
+        caption: 'total item',
+      ),
+    ];
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Faktor ukuran huruf pada teks 13 px (judul kartu); 1,0 pada ukuran normal.
+        final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
+        final rowWidth = (3 * _statWidth + 2 * CorrectionSizes.gapXs) * scale;
+        if (constraints.maxWidth < rowWidth) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final card in cards)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: CorrectionSizes.gapXs),
+                  child: card,
+                ),
+            ],
+          );
+        }
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: cards[0]),
+              const SizedBox(width: CorrectionSizes.gapXs),
+              Expanded(child: cards[1]),
+              const SizedBox(width: CorrectionSizes.gapXs),
+              Expanded(child: cards[2]),
+            ],
+          ),
+        );
+      },
     );
   }
 
   List<Widget> _listChildren(ModerationQueue queue) {
     final all = _tab == ModerationQueue.semua;
+    final previous = queue.previousPage;
+    final next = queue.nextPage;
     return [
       Row(
         children: [
           Expanded(
             child: Text(
               all ? 'Semua pengajuan' : 'Antrean pengajuan',
-              style: const TextStyle(
-                color: CorrectionColors.ink,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
+              style: CorrectionText.cardTitle,
             ),
           ),
           Text(
             '${formatThousands(queue.count)} item',
-            style: const TextStyle(color: CorrectionColors.muted, fontSize: 12),
+            style: CorrectionText.caption,
           ),
         ],
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: CorrectionSizes.gapSm),
       Wrap(
-        spacing: 8,
-        runSpacing: 4,
+        spacing: CorrectionSizes.gapXs,
+        runSpacing: CorrectionSizes.gapXs,
         children: [
-          ChoiceChip(
-            label: const Text('Semua field'),
+          FilterChoice(
+            label: 'Semua field',
             selected: queue.field == null,
-            onSelected: (_) => _filter(status: queue.status),
+            onSelected: () => _filter(status: queue.status),
           ),
           for (final option in queue.fieldOptions)
-            ChoiceChip(
-              label: Text(option.label),
+            FilterChoice(
+              label: option.label,
               selected: option.key == queue.field,
-              onSelected: (_) =>
+              onSelected: () =>
                   _filter(field: option.key, status: queue.status),
             ),
         ],
       ),
       if (queue.statusOptions.isNotEmpty) ...[
-        const SizedBox(height: 8),
+        const SizedBox(height: CorrectionSizes.gapXs),
         Wrap(
-          spacing: 8,
-          runSpacing: 4,
+          spacing: CorrectionSizes.gapXs,
+          runSpacing: CorrectionSizes.gapXs,
           children: [
-            ChoiceChip(
-              label: const Text('Semua status'),
+            FilterChoice(
+              label: 'Semua status',
               selected: queue.status == null,
-              onSelected: (_) => _filter(field: queue.field),
+              onSelected: () => _filter(field: queue.field),
             ),
             for (final option in queue.statusOptions)
-              ChoiceChip(
-                label: Text(option.label),
+              FilterChoice(
+                label: option.label,
                 selected: option.key == queue.status,
-                onSelected: (_) =>
+                onSelected: () =>
                     _filter(field: queue.field, status: option.key),
               ),
           ],
         ),
       ],
-      const SizedBox(height: 16),
+      const SizedBox(height: CorrectionSizes.gapMd),
       if (queue.results.isEmpty)
         all
             ? const EmptyState(
@@ -312,37 +334,15 @@ class _ModerationPageState extends State<ModerationPage> {
             row: row,
             onReview: () => _review(row),
           ),
-        if (queue.numPages > 1) _pagination(queue),
+        if (queue.numPages > 1)
+          PageNav(
+            page: queue.page,
+            numPages: queue.numPages,
+            onPrevious: previous == null ? null : () => _go(previous),
+            onNext: next == null ? null : () => _go(next),
+          ),
       ],
     ];
-  }
-
-  Widget _pagination(ModerationQueue queue) {
-    final previous = queue.previousPage;
-    final next = queue.nextPage;
-    return Row(
-      children: [
-        TextButton.icon(
-          onPressed: previous == null ? null : () => _go(previous),
-          icon: const Icon(Icons.chevron_left),
-          label: const Text('Sebelumnya'),
-        ),
-        Expanded(
-          child: Text(
-            'Halaman ${queue.page} dari ${queue.numPages}',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: CorrectionColors.muted, fontSize: 13),
-          ),
-        ),
-        TextButton(
-          onPressed: next == null ? null : () => _go(next),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [Text('Berikutnya'), Icon(Icons.chevron_right)],
-          ),
-        ),
-      ],
-    );
   }
 
   Widget _guideView() {
@@ -351,25 +351,18 @@ class _ModerationPageState extends State<ModerationPage> {
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Padding(
-            padding: EdgeInsets.all(32),
-            child: Center(child: CircularProgressIndicator()),
+            padding: EdgeInsets.all(CorrectionSizes.gapXl),
+            child: LoadingView(),
           );
         }
         final error = snapshot.error;
         if (error != null) {
-          return Column(
-            children: [
-              Text(
-                error is ApiError ? error.message : 'Gagal memuat panduan.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _retryGuide,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Coba lagi'),
-              ),
-            ],
+          return ErrorView(
+            message: error is ApiError
+                ? error.message
+                : 'Gagal memuat panduan.',
+            onRetry: _retryGuide,
+            scrollable: false,
           );
         }
         return _FieldGuide(fields: snapshot.data!);
@@ -386,46 +379,24 @@ class _ModerationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const muted = TextStyle(color: CorrectionColors.muted, fontSize: 14);
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: CorrectionColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: CorrectionColors.border),
-      ),
+      margin: const EdgeInsets.only(bottom: CorrectionSizes.gapSm),
+      padding: const EdgeInsets.all(CorrectionSizes.gapMd),
+      decoration: CorrectionDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            row.product.displayName,
-            style: const TextStyle(
-              color: CorrectionColors.ink,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text(row.product.displayName, style: CorrectionText.itemTitle),
           if (row.product.subtitle.isNotEmpty)
-            Text(
-              row.product.subtitle,
-              style: const TextStyle(
-                color: CorrectionColors.muted,
-                fontSize: 12,
-              ),
-            ),
+            Text(row.product.subtitle, style: CorrectionText.caption),
           Text(
             '${row.submittedBy} · ${formatAgo(row.createdAt)}',
-            style: const TextStyle(color: CorrectionColors.muted, fontSize: 12),
+            style: CorrectionText.caption,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: CorrectionSizes.gapSm),
           Text.rich(
             TextSpan(
-              style: const TextStyle(
-                color: CorrectionColors.ink,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              style: CorrectionText.value,
               children: [
                 const TextSpan(
                   text: 'Field: ',
@@ -441,12 +412,12 @@ class _ModerationCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Saat ini: ${displayOrUnknown(row.currentDisplay)}',
-            style: muted,
+            style: CorrectionText.meta,
           ),
           const SizedBox(height: 4),
           Text.rich(
             TextSpan(
-              style: muted,
+              style: CorrectionText.meta,
               children: [
                 const TextSpan(text: 'Usulan: '),
                 TextSpan(
@@ -459,12 +430,12 @@ class _ModerationCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: CorrectionSizes.gapSm),
           Row(
             children: [
               Expanded(
                 child: Wrap(
-                  spacing: 8,
+                  spacing: CorrectionSizes.gapXs,
                   runSpacing: 6,
                   children: [
                     CorrectionStatusChip(
@@ -475,17 +446,10 @@ class _ModerationCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: CorrectionSizes.gapXs),
               FilledButton(
                 onPressed: onReview,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 44),
-                  backgroundColor: CorrectionColors.soft,
-                  foregroundColor: CorrectionColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+                style: CorrectionButtons.tonal,
                 child: Text(row.isPending ? 'Review' : 'Lihat'),
               ),
             ],
@@ -538,67 +502,41 @@ class _FieldGuide extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: CorrectionColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: CorrectionColors.border),
-      ),
+      decoration: CorrectionDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Panduan field',
-            style: TextStyle(
-              color: CorrectionColors.ink,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          const Text('Panduan field', style: CorrectionText.cardTitle),
           const SizedBox(height: 4),
           Text(
             'Hanya ${fields.length} field berikut yang bisa dikoreksi pengguna. Aturannya sama dengan pemeriksaan '
             'otomatis saat pengajuan dibuat dan saat disetujui.',
-            style: const TextStyle(color: CorrectionColors.muted, fontSize: 13),
+            style: CorrectionText.meta,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: CorrectionSizes.gapXs),
           for (final field in fields)
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                vertical: CorrectionSizes.gapSm,
+              ),
               decoration: const BoxDecoration(
                 border: Border(top: BorderSide(color: CorrectionColors.border)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    field.label,
-                    style: const TextStyle(
-                      color: CorrectionColors.ink,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  Text(field.label, style: CorrectionText.itemTitle),
                   Text(
                     '${field.kind} · ${field.fieldName}',
-                    style: const TextStyle(
-                      color: CorrectionColors.muted,
-                      fontSize: 12,
-                    ),
+                    style: CorrectionText.caption,
                   ),
                   const SizedBox(height: 6),
                   for (final rule in field.rules) _Bullet(rule),
                 ],
               ),
             ),
-          const SizedBox(height: 16),
-          const Text(
-            'Cara meninjau',
-            style: TextStyle(
-              color: CorrectionColors.ink,
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          const SizedBox(height: CorrectionSizes.gapMd),
+          const Text('Cara meninjau', style: CorrectionText.itemTitle),
           const SizedBox(height: 6),
           for (final line in _howTo) _Bullet(line),
         ],
@@ -619,17 +557,11 @@ class _Bullet extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '•  ',
-            style: TextStyle(color: CorrectionColors.muted, fontSize: 13),
-          ),
+          const Text('•  ', style: CorrectionText.meta),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: CorrectionColors.ink2,
-                fontSize: 13,
-              ),
+              style: CorrectionText.meta.copyWith(color: CorrectionColors.ink2),
             ),
           ),
         ],

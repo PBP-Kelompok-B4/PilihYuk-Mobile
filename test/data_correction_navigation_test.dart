@@ -97,6 +97,46 @@ Future<void> pumpQueue(WidgetTester tester, FakeRequest request) async {
   await tester.pumpAndSettle();
 }
 
+/// Halaman milik anggota lain (bukan halaman modul): tombol "Bantu lengkapi data" untuk produk 107 memanggil
+/// openCorrectionForm. Hasil tiap ketukan dicatat di list yang dikembalikan.
+Future<List<bool>> pumpFriendPage(
+  WidgetTester tester,
+  FakeRequest request, {
+  List<String> fields = const [],
+}) async {
+  final results = <bool>[];
+  tester.view.physicalSize = const Size(1000, 4000);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    Provider<CookieRequest>.value(
+      value: request,
+      child: MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () async {
+                final sent = await openCorrectionForm(
+                  context,
+                  productId: 107,
+                  fields: fields,
+                );
+                results.add(sent);
+              },
+              child: const Text('Bantu lengkapi data'),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  return results;
+}
+
+/// Form yang sedang terbuka.
+CorrectionFormPage openedForm(WidgetTester tester) =>
+    tester.widget(find.byType(CorrectionFormPage));
+
 void main() {
   testWidgets(
     'guests get the login sheet instead of the form or Pengajuan Saya',
@@ -304,4 +344,115 @@ void main() {
       ]);
     },
   );
+
+  testWidgets('openCorrectionForm opens the form with the given fields', (
+    tester,
+  ) async {
+    final log = await withMockServer(server(() => member), () async {
+      final results = await pumpFriendPage(
+        tester,
+        FakeRequest()..loggedIn = true,
+        fields: ['fiber_100g', 'sodium_100g'],
+      );
+      await tester.tap(find.text('Bantu lengkapi data'));
+      await tester.pumpAndSettle();
+      expect(find.text(loginRequiredTitle), findsNothing);
+      expect(openedForm(tester).productId, 107);
+      expect(openedForm(tester).focus, ['fiber_100g', 'sodium_100g']);
+
+      // Ditutup tanpa mengirim: kembali ke halaman pemanggil, hasilnya false.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(CorrectionFormPage), findsNothing);
+      expect(find.text('Bantu lengkapi data'), findsOneWidget);
+      expect(results, [false]);
+    });
+    expect(routes(log), ['GET me/', 'GET products/107/form/']);
+    final query = log.last.url.queryParametersAll;
+    expect(query['field'], ['fiber_100g', 'sodium_100g']);
+  });
+
+  testWidgets('openCorrectionForm asks guests to log in before the form', (
+    tester,
+  ) async {
+    var me = guest;
+    final request = FakeRequest();
+    final log = await withMockServer(server(() => me), () async {
+      final results = await pumpFriendPage(
+        tester,
+        request,
+        fields: ['fiber_100g'],
+      );
+      await tester.tap(find.text('Bantu lengkapi data'));
+      await tester.pumpAndSettle();
+      expect(find.text(loginRequiredTitle), findsOneWidget);
+      await tester.tap(find.byTooltip('Tutup'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CorrectionFormPage), findsNothing);
+      expect(results, [false]);
+
+      // Masuk lewat sheet: Katalog dari LoginPage ditutup, lalu form terbuka di atas halaman pemanggil.
+      await tester.tap(find.text('Bantu lengkapi data'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Masuk'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LoginPage), findsOneWidget);
+      // Meniru LoginPage yang berhasil: sesi terpasang, lalu pushReplacement ke Katalog.
+      request.loggedIn = true;
+      me = member;
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+      navigator.pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => const Scaffold(body: Text('Katalog')),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Katalog'), findsNothing);
+      expect(openedForm(tester).focus, ['fiber_100g']);
+    });
+    expect(routes(log), ['GET me/', 'GET me/', 'GET products/107/form/']);
+  });
+
+  testWidgets('openCorrectionForm ignores unknown field names safely', (
+    tester,
+  ) async {
+    final log = await withMockServer(server(() => member), () async {
+      await pumpFriendPage(
+        tester,
+        FakeRequest()..loggedIn = true,
+        fields: ['harga', 'fiber_100g', 'Fiber_100g', 'fiber_100g', ''],
+      );
+      await tester.tap(find.text('Bantu lengkapi data'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(openedForm(tester).focus, ['fiber_100g']);
+    });
+    // Yang dikirim ke server hanya field yang sah, sekali.
+    final query = log.last.url.queryParametersAll;
+    expect(query['field'], ['fiber_100g']);
+  });
+
+  testWidgets('openCorrectionForm returns true after sending', (tester) async {
+    final log = await withMockServer(server(() => member), () async {
+      final results = await pumpFriendPage(
+        tester,
+        FakeRequest()..loggedIn = true,
+        fields: ['fiber_100g'],
+      );
+      await tester.tap(find.text('Bantu lengkapi data'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), '7,5');
+      await tester.tap(find.text('Ajukan Koreksi'));
+      await tester.pumpAndSettle();
+      expect(find.text('Pengajuan berhasil dikirim'), findsNWidgets(2));
+      expect(results, [true]); // halaman sukses masih tampil
+
+      // Kembali dari halaman sukses: ke halaman pemanggil, bukan ke antrean.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.text('Bantu lengkapi data'), findsOneWidget);
+      expect(find.byType(DataCorrectionPage), findsNothing);
+    });
+    expect(routes(log), ['GET me/', 'GET products/107/form/', 'POST mine/']);
+  });
 }

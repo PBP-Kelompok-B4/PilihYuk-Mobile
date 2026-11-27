@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/config.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_form_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 import 'package:pilihyuk_mobile/screens/login.dart';
 import 'package:pilihyuk_mobile/screens/register.dart';
@@ -11,6 +12,83 @@ import 'package:pilihyuk_mobile/screens/register.dart';
 const loginRequiredTitle = 'Masuk untuk menggunakan fitur ini.';
 const loginRequiredMessage =
     'Ajukan koreksi dan lihat Pengajuan Saya membutuhkan akun.';
+
+/// Nama field yang bisa dikoreksi, sama dengan CORRECTABLE_FIELDS di web (data_correction/constants.py).
+/// Teks: product_name, brand, quantity, category, origin. Angka: nova_group (1 sampai 4), energy_kcal_100g
+/// (kkal), proteins_100g, fat_100g, saturated_fat_100g, carbohydrates_100g, sugars_100g, fiber_100g (gram),
+/// dan sodium_100g (diisi dalam mg). Semua angka gizi per 100 g.
+const correctableFields = [
+  'product_name',
+  'brand',
+  'quantity',
+  'category',
+  'origin',
+  'nova_group',
+  'energy_kcal_100g',
+  'proteins_100g',
+  'fat_100g',
+  'saturated_fat_100g',
+  'carbohydrates_100g',
+  'sugars_100g',
+  'fiber_100g',
+  'sodium_100g',
+];
+
+/// Pintu masuk form Lengkapi Data untuk halaman anggota lain, cukup satu baris. Gerbang login (GET me/, lalu
+/// sheet "Masuk untuk menggunakan fitur ini." bila belum masuk), form, dan halaman sukses diurus modul ini;
+/// tombol kembali di halaman modul pulang ke halaman pemanggil. Modul ini tidak mengimpor halaman pemanggil.
+///
+/// - productId: id Product di server, sama dengan id di katalog.
+/// - fields: baris awal form, nama dari [correctableFields]. Kosong berarti satu baris kosong. Nama lain dan
+///   nama ganda diabaikan, seperti ?field= di web.
+///
+/// Hasil: true bila pengajuan terkirim (saat itu halaman sukses sedang tampil di atas halaman pemanggil);
+/// false bila pengguna tidak jadi masuk atau menutup form tanpa mengirim. Produk yang tidak ada atau nonaktif
+/// ditangani form sendiri (pesan galat dan Coba lagi).
+///
+/// Tombol di detail produk (Yasmin):
+/// ```dart
+/// OutlinedButton(
+///   onPressed: () => openCorrectionForm(context, productId: product.id),
+///   child: const Text('Bantu lengkapi data'),
+/// )
+/// ```
+///
+/// Sel "Tidak diketahui" di tabel pembanding shelf (Daffaa); fields berisi field baris itu:
+/// ```dart
+/// TextButton(
+///   onPressed: () => openCorrectionForm(context, productId: productId, fields: ['sodium_100g']),
+///   child: const Text('Tidak diketahui'),
+/// )
+/// ```
+Future<bool> openCorrectionForm(
+  BuildContext context, {
+  required int productId,
+  List<String> fields = const [],
+}) async {
+  final viewer = await loadViewer(context.read<CookieRequest>());
+  if (!context.mounted) {
+    return false;
+  }
+  if (!await ensureLoggedIn(context, viewer: viewer)) {
+    return false;
+  }
+  if (!context.mounted) {
+    return false;
+  }
+  // toSet membuang nama ganda tanpa mengubah urutan; nama di luar daftar dibuang.
+  final focus = [
+    for (final name in fields.toSet())
+      if (correctableFields.contains(name)) name,
+  ];
+  // Setelah POST berhasil, form menggantikan dirinya dengan halaman sukses lewat pushReplacement(result: true).
+  final result = await pushModulePage<Object?>(
+    context,
+    'form',
+    CorrectionFormPage(productId: productId, focus: focus),
+  );
+  return result == true;
+}
 
 /// Awalan nama route halaman modul. Antrean sendiri dibuka drawer tanpa nama, jadi "kembali ke antrean"
 /// berarti menutup semua route yang namanya berawalan ini.

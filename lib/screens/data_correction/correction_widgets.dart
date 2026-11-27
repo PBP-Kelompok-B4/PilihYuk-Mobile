@@ -1,74 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_styles.dart';
+
+// Layar modul cukup mengimpor file ini: gaya dan komponen keadaan ikut diekspor.
+export 'package:pilihyuk_mobile/screens/data_correction/correction_styles.dart';
+export 'package:pilihyuk_mobile/screens/data_correction/state_views.dart';
 
 /// Pesan untuk 403 authentication_required (sesi habis).
 const sessionEndedMessage = 'Sesi berakhir. Masuk lagi untuk melanjutkan.';
 const withdrawnMessage = 'Pengajuan berhasil ditarik.';
-
-/// Warna bersama halaman Antrean Data: token Figma (285:5593) dan warna khusus web.
-abstract final class CorrectionColors {
-  static const canvas = Color(0xFFF7F5F0);
-  static const surface = Color(0xFFFFFFFF);
-  static const secondary = Color(0xFFF1EEE7);
-  static const tertiary = Color(0xFFE9E5DB);
-  static const border = Color(0xFFE4E0D6);
-  static const strong = Color(0xFFCFC9BB);
-  static const ink = Color(0xFF16201A);
-  static const ink2 = Color(0xFF3C443E);
-  static const muted = Color(0xFF6E756E);
-  static const muted2 = Color(0xFF969C95);
-  static const primary = Color(0xFF1E6F4C);
-  static const hover = Color(0xFF16583C);
-  static const soft = Color(0xFFE1EFE6);
-  static const accent = Color(0xFFDE7A33);
-  static const accentSoft = Color(0xFFFBEBDD);
-  static const warning = Color(0xFFB47800);
-  static const warningSoft = Color(0xFFFBF0D6);
-  static const error = Color(0xFFC0341F);
-  static const errorSoft = Color(0xFFFAE3DF);
-
-  // Khusus situs web (templates/components/tailwind.html dan _status_chip.html).
-  static const accentText = Color(0xFFA33D00);
-  static const leaf = Color(0xFFE4EFE0);
-  static const missing = Color(0xFFFDF0C4);
-  static const missingText = Color(0xFF6B4D00);
-  static const rejectedSoft = Color(0xFFFDE7E4);
-  static const rejectedText = Color(0xFFB42318);
-}
-
-/// Pesan galat dengan tombol "Coba lagi". Berupa ListView, jadi tetap bisa ditarik untuk memuat ulang.
-class ErrorView extends StatelessWidget {
-  const ErrorView({super.key, required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(32),
-      children: [
-        const Icon(
-          Icons.error_outline,
-          size: 40,
-          color: CorrectionColors.error,
-        ),
-        const SizedBox(height: 12),
-        Text(message, textAlign: TextAlign.center),
-        const SizedBox(height: 16),
-        Center(
-          child: FilledButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Coba lagi'),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 /// Chip "Tidak diketahui" untuk nilai kosong, warnanya sama dengan web.
 class UnknownChip extends StatelessWidget {
@@ -138,6 +79,112 @@ class CorrectionStatusChip extends StatelessWidget {
   }
 }
 
+/// Chip pilihan filter seperti .chip di web: terpilih hijau muda bergaris hijau, lainnya putih bergaris abu.
+class FilterChoice extends StatelessWidget {
+  const FilterChoice({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? CorrectionColors.primary : CorrectionColors.ink;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      showCheckmark: false,
+      backgroundColor: CorrectionColors.surface,
+      selectedColor: CorrectionColors.soft,
+      side: BorderSide(
+        color: selected ? CorrectionColors.primary : CorrectionColors.tertiary,
+      ),
+      shape: const StadiumBorder(),
+      labelStyle: TextStyle(
+        color: color,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+/// "Halaman x dari y" dengan Sebelumnya dan Berikutnya (null = nonaktif). Tiap tombol mendapat separuh
+/// lebar, jadi di layar sempit atau huruf besar teksnya turun baris, tidak meluap.
+class PageNav extends StatelessWidget {
+  const PageNav({
+    super.key,
+    required this.page,
+    required this.numPages,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int page;
+  final int numPages;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextButton.styleFrom(
+      foregroundColor: CorrectionColors.primary,
+      minimumSize: const Size(0, CorrectionSizes.touchTarget),
+    );
+    return Column(
+      children: [
+        Text(
+          'Halaman $page dari $numPages',
+          textAlign: TextAlign.center,
+          style: CorrectionText.meta,
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: onPrevious,
+                  style: style,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.chevron_left),
+                      Flexible(child: Text('Sebelumnya')),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: onNext,
+                  style: style,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(child: Text('Berikutnya')),
+                      Icon(Icons.chevron_right),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 /// Catatan "Usulan belum disetujui" di form dan di detail pengajuan yang masih menunggu.
 class PendingNotice extends StatelessWidget {
   const PendingNotice({super.key});
@@ -146,9 +193,9 @@ class PendingNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: CorrectionColors.warningSoft,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: CorrectionSizes.controlRadius,
       ),
       child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,85 +218,6 @@ class PendingNotice extends StatelessWidget {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Keadaan kosong: ikon, judul, teks singkat, dan tombol opsional (seperti _empty_state.html di web).
-class EmptyState extends StatelessWidget {
-  const EmptyState({
-    super.key,
-    required this.icon,
-    required this.title,
-    this.text = '',
-    this.actionLabel,
-    this.onAction,
-  });
-
-  final IconData icon;
-  final String title;
-  final String text;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = actionLabel;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 32),
-      decoration: BoxDecoration(
-        color: CorrectionColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: CorrectionColors.border),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: CorrectionColors.secondary,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: CorrectionColors.muted),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: CorrectionColors.ink,
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (text.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              text,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: CorrectionColors.muted,
-                fontSize: 13,
-              ),
-            ),
-          ],
-          if (label != null && onAction != null) ...[
-            const SizedBox(height: 20),
-            FilledButton(
-              onPressed: onAction,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 44),
-                backgroundColor: CorrectionColors.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: Text(label),
-            ),
-          ],
         ],
       ),
     );
@@ -296,9 +264,6 @@ class _ConfirmSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-    );
     return SafeArea(
       top: false,
       child: Padding(
@@ -323,49 +288,37 @@ class _ConfirmSheet extends StatelessWidget {
               ),
               child: Icon(icon, color: CorrectionColors.error),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: CorrectionSizes.gapMd),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: CorrectionColors.ink,
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-              ),
+              style: CorrectionText.sectionTitle,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: CorrectionSizes.gapXs),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: CorrectionColors.muted,
-                fontSize: 15,
-              ),
+              style: CorrectionText.bodyMuted,
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: CorrectionSizes.gapLg),
             Row(
               children: [
                 Expanded(
                   child: FilledButton(
                     onPressed: () => Navigator.pop(context, false),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      backgroundColor: CorrectionColors.tertiary,
-                      foregroundColor: CorrectionColors.ink,
-                      shape: shape,
+                    style: CorrectionButtons.primary(
+                      background: CorrectionColors.tertiary,
+                      foreground: CorrectionColors.ink,
                     ),
                     child: const Text('Batal'),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: CorrectionSizes.gapSm),
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: () => Navigator.pop(context, true),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      backgroundColor: CorrectionColors.error,
-                      foregroundColor: Colors.white,
-                      shape: shape,
+                    style: CorrectionButtons.primary(
+                      background: CorrectionColors.error,
                     ),
                     icon: Icon(icon),
                     label: Text(confirmLabel),
@@ -391,11 +344,9 @@ class WithdrawButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return OutlinedButton(
       onPressed: busy ? null : onPressed,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 44),
-        foregroundColor: CorrectionColors.error,
-        side: BorderSide(color: CorrectionColors.error.withValues(alpha: 0.4)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      style: CorrectionButtons.outlined(
+        foreground: CorrectionColors.error,
+        border: CorrectionColors.error.withValues(alpha: 0.4),
       ),
       child: busy
           ? const Row(
@@ -427,17 +378,23 @@ Future<bool> confirmWithdraw(BuildContext context, Correction correction) {
   );
 }
 
-/// Hasil DELETE mine/{id}/. gone: pengajuan sudah tidak ada (204 atau 404). reload: data di layar perlu dimuat
-/// ulang (gone, atau 409 karena kurator baru saja meninjau). message: teks untuk SnackBar.
-typedef WithdrawOutcome = ({bool gone, bool reload, String message});
+/// Hasil DELETE mine/{id}/. success: 204. gone: pengajuan sudah tidak ada (204 atau 404). reload: data di layar
+/// perlu dimuat ulang (gone, atau 409 karena kurator baru saja meninjau). message: teks untuk toast.
+typedef WithdrawOutcome = ({
+  bool success,
+  bool gone,
+  bool reload,
+  String message,
+});
 
 Future<WithdrawOutcome> withdrawCorrection(CorrectionApi api, int id) async {
   try {
     await api.withdraw(id);
-    return (gone: true, reload: true, message: withdrawnMessage);
+    return (success: true, gone: true, reload: true, message: withdrawnMessage);
   } on ApiError catch (error) {
     final gone = error.status == 404;
     return (
+      success: false,
       gone: gone,
       reload: gone || error.status == 409,
       message: error.needsLogin ? sessionEndedMessage : error.message,

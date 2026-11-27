@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 
-/// Empat kartu statistik, label sama dengan /antrean/ di situs web.
+/// Empat kartu statistik, label dan warna sama dengan /antrean/ di situs web.
 class QueueStatsGrid extends StatelessWidget {
   const QueueStatsGrid({
     super.key,
@@ -27,7 +27,7 @@ class QueueStatsGrid extends StatelessWidget {
       StatCard(
         icon: Icons.calendar_today_outlined,
         background: CorrectionColors.secondary,
-        foreground: Colors.black87,
+        foreground: CorrectionColors.ink,
         value: formatThousands(stats.submittedLast7Days),
         title: 'Diajukan minggu ini',
         caption: 'pengajuan 7 hari terakhir',
@@ -55,13 +55,13 @@ class QueueStatsGrid extends StatelessWidget {
       children: [
         for (var i = 0; i < cards.length; i += 2)
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(bottom: CorrectionSizes.gapXs),
             child: IntrinsicHeight(
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(child: cards[i]),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: CorrectionSizes.gapXs),
                   Expanded(child: cards[i + 1]),
                 ],
               ),
@@ -72,7 +72,7 @@ class QueueStatsGrid extends StatelessWidget {
   }
 }
 
-/// Kartu statistik: ikon dalam lingkaran, angka, judul, dan keterangan (juga dipakai Moderasi Data).
+/// Kartu statistik seperti _stat_card.html: kotak ikon, angka, judul, dan keterangan (juga dipakai Moderasi Data).
 class StatCard extends StatelessWidget {
   const StatCard({
     super.key,
@@ -93,36 +93,37 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: background,
-              child: Icon(icon, size: 18, color: foreground),
+    return Container(
+      padding: const EdgeInsets.all(CorrectionSizes.gapSm),
+      decoration: CorrectionDecorations.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(title, style: textTheme.labelLarge),
-            Text(caption, style: textTheme.bodySmall),
-          ],
-        ),
+            child: Icon(icon, size: 20, color: foreground),
+          ),
+          const SizedBox(height: CorrectionSizes.gapXs),
+          // Angka panjang mengecil, tidak terpotong ke baris baru, di kartu sempit atau huruf besar.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value, style: CorrectionText.stat),
+          ),
+          Text(title, style: CorrectionText.label),
+          Text(caption, style: CorrectionText.caption),
+        ],
       ),
     );
   }
 }
 
-/// Satu produk di antrean: gambar, nama, merek · isi, data yang kurang, shelf, dan status.
+/// Satu produk di antrean: gambar, nama, merek · isi, data yang kurang, shelf, status, dan "Lengkapi Data".
 class QueueProductCard extends StatelessWidget {
   const QueueProductCard({
     super.key,
@@ -135,74 +136,71 @@ class QueueProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ProductImage(url: product.imageUrl),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        product.productName.trim().isEmpty
-                            ? 'Produk tanpa nama'
-                            : product.productName,
-                        style: textTheme.titleMedium,
-                      ),
-                      if (product.subtitle.isNotEmpty)
-                        Text(product.subtitle, style: textTheme.bodySmall),
-                    ],
-                  ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: CorrectionSizes.gapSm),
+      padding: const EdgeInsets.all(CorrectionSizes.gapMd),
+      decoration: CorrectionDecorations.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ProductImage(url: product.imageUrl),
+              const SizedBox(width: CorrectionSizes.gapSm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.productName.trim().isEmpty
+                          ? 'Produk tanpa nama'
+                          : product.productName,
+                      style: CorrectionText.itemTitle,
+                    ),
+                    if (product.subtitle.isNotEmpty)
+                      Text(product.subtitle, style: CorrectionText.caption),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text('Data yang kurang:', style: textTheme.labelMedium),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final entry in product.missing)
-                  _MissingChip(label: entry.label),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                QueueStatusChip(
-                  status: product.status,
-                  label: product.statusLabel,
-                ),
-                if (product.shelfCount != null)
-                  Text(
-                    'Ada di ${formatThousands(product.shelfCount!)} shelf',
-                    style: textTheme.bodySmall,
-                  ),
-              ],
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onContribute,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Lengkapi Data'),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: CorrectionSizes.gapSm),
+          const Text('Data yang kurang:', style: CorrectionText.caption),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final entry in product.missing)
+                _MissingChip(label: entry.label),
+            ],
+          ),
+          const SizedBox(height: CorrectionSizes.gapSm),
+          Wrap(
+            spacing: CorrectionSizes.gapSm,
+            runSpacing: CorrectionSizes.gapXs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              QueueStatusChip(
+                status: product.status,
+                label: product.statusLabel,
+              ),
+              if (product.shelfCount case final count?)
+                Text(
+                  'Ada di ${formatThousands(count)} shelf',
+                  style: CorrectionText.caption,
+                ),
+            ],
+          ),
+          const SizedBox(height: CorrectionSizes.gapSm),
+          FilledButton.icon(
+            onPressed: onContribute,
+            style: CorrectionButtons.tonal,
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            label: const Text('Lengkapi Data'),
+          ),
+        ],
       ),
     );
   }
@@ -215,12 +213,15 @@ class _ProductImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const placeholder = Icon(Icons.image_outlined, color: Colors.black45);
+    const placeholder = Icon(
+      Icons.image_outlined,
+      color: CorrectionColors.muted,
+    );
     return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: CorrectionSizes.controlRadius,
       child: Container(
-        width: 56,
-        height: 56,
+        width: 48,
+        height: 48,
         color: CorrectionColors.secondary,
         alignment: Alignment.center,
         child: url.isEmpty
@@ -257,11 +258,13 @@ class _MissingChip extends StatelessWidget {
             color: CorrectionColors.missingText,
           ),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: CorrectionColors.missingText,
-              fontSize: 12,
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: CorrectionColors.missingText,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -291,7 +294,9 @@ class QueueStatusChip extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          color: verification ? Colors.black87 : CorrectionColors.accentText,
+          color: verification
+              ? CorrectionColors.ink
+              : CorrectionColors.accentText,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),

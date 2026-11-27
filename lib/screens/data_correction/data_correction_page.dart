@@ -92,7 +92,7 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
     await Future.wait([_reload(), _loadViewer()]);
   }
 
-  // Chip dan tombol halaman memakai sort dan missing dari balasan terakhir.
+  // Chip, tombol halaman, dan "Bersihkan filter" memakai sort dan missing dari balasan terakhir.
   void _show({required String sort, String? missing, int page = 1}) {
     _sort = sort;
     _missing = missing;
@@ -186,7 +186,7 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
             // Saat memuat ulang, FutureBuilder masih menyimpan data lama: tampilkan dengan
             // garis progres supaya chip dan daftar tidak hilang.
             if (loading && !snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const LoadingView();
             }
             if (snapshot.hasError) {
               return ErrorView(
@@ -202,124 +202,112 @@ class _DataCorrectionPageState extends State<DataCorrectionPage> {
   }
 
   Widget _queueView(CorrectionQueue queue, bool loading) {
-    final textTheme = Theme.of(context).textTheme;
+    final previous = queue.previousPage;
+    final next = queue.nextPage;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(CorrectionSizes.inset),
       children: [
-        if (loading) const LinearProgressIndicator(),
-        Text(
+        if (loading)
+          const LinearProgressIndicator(color: CorrectionColors.primary),
+        const Text(
           'Bantu lengkapi data produk yang sering muncul di shelf. Nama pengaju tidak ditampilkan.',
-          style: textTheme.bodyMedium,
+          style: CorrectionText.bodyMuted,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: CorrectionSizes.gapMd),
         QueueStatsGrid(
           stats: queue.stats,
           shelfAvailable: queue.shelfAvailable,
         ),
-        const SizedBox(height: 8),
-        Text('Urutkan', style: textTheme.labelLarge),
-        const SizedBox(height: 4),
+        const SizedBox(height: CorrectionSizes.gapSm),
+        const Text('Urutkan', style: CorrectionText.label),
+        const SizedBox(height: CorrectionSizes.gapXs),
         Wrap(
-          spacing: 8,
-          runSpacing: 4,
+          spacing: CorrectionSizes.gapXs,
+          runSpacing: CorrectionSizes.gapXs,
           children: [
             for (final option in queue.sortOptions)
-              ChoiceChip(
-                label: Text(option.label),
+              FilterChoice(
+                label: option.label,
                 selected: option.key == queue.sort,
-                onSelected: (_) =>
+                onSelected: () =>
                     _show(sort: option.key, missing: queue.missing),
               ),
           ],
         ),
-        const SizedBox(height: 12),
-        Text('Data yang kurang', style: textTheme.labelLarge),
-        const SizedBox(height: 4),
+        const SizedBox(height: CorrectionSizes.gapMd),
+        const Text('Data yang kurang', style: CorrectionText.label),
+        const SizedBox(height: CorrectionSizes.gapXs),
         Wrap(
-          spacing: 8,
-          runSpacing: 4,
+          spacing: CorrectionSizes.gapXs,
+          runSpacing: CorrectionSizes.gapXs,
           children: [
-            ChoiceChip(
-              label: const Text('Semua'),
+            FilterChoice(
+              label: 'Semua',
               selected: queue.missing == null,
-              onSelected: (_) => _show(sort: queue.sort),
+              onSelected: () => _show(sort: queue.sort),
             ),
             for (final option in queue.missingOptions)
-              ChoiceChip(
-                label: Text(option.label),
+              FilterChoice(
+                label: option.label,
                 selected: option.key == queue.missing,
-                onSelected: (_) => _show(sort: queue.sort, missing: option.key),
+                onSelected: () => _show(sort: queue.sort, missing: option.key),
               ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: CorrectionSizes.gapMd),
         Text(
           '${formatThousands(queue.count)} produk',
-          style: textTheme.bodySmall,
+          style: CorrectionText.caption,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: CorrectionSizes.gapXs),
         if (queue.results.isEmpty)
-          Padding(
-            padding: const EdgeInsets.all(32),
-            child: Text(
-              queue.missing == null
-                  ? 'Semua data produk sudah lengkap.'
-                  : 'Tidak ada produk yang kekurangan data jenis ini.',
-              textAlign: TextAlign.center,
-            ),
-          )
+          _emptyView(queue)
         else ...[
           for (final product in queue.results)
             QueueProductCard(
               product: product,
               onContribute: () => _contribute(product),
             ),
-          _pagination(queue),
+          PageNav(
+            page: queue.page,
+            numPages: queue.numPages,
+            onPrevious: previous == null
+                ? null
+                : () => _show(
+                    sort: queue.sort,
+                    missing: queue.missing,
+                    page: previous,
+                  ),
+            onNext: next == null
+                ? null
+                : () => _show(
+                    sort: queue.sort,
+                    missing: queue.missing,
+                    page: next,
+                  ),
+          ),
         ],
       ],
     );
   }
 
-  Widget _pagination(CorrectionQueue queue) {
-    final previous = queue.previousPage;
-    final next = queue.nextPage;
-    return Column(
-      children: [
-        Text(
-          'Halaman ${queue.page} dari ${queue.numPages}',
-          textAlign: TextAlign.center,
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            TextButton.icon(
-              onPressed: previous == null
-                  ? null
-                  : () => _show(
-                      sort: queue.sort,
-                      missing: queue.missing,
-                      page: previous,
-                    ),
-              icon: const Icon(Icons.chevron_left),
-              label: const Text('Sebelumnya'),
-            ),
-            TextButton(
-              onPressed: next == null
-                  ? null
-                  : () => _show(
-                      sort: queue.sort,
-                      missing: queue.missing,
-                      page: next,
-                    ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [Text('Berikutnya'), Icon(Icons.chevron_right)],
-              ),
-            ),
-          ],
-        ),
-      ],
+  /// Teks sama dengan web. Filter aktif: "Bersihkan filter" membuang filter jenis data, urutan tetap
+  /// (seperti clear_url di web).
+  Widget _emptyView(CorrectionQueue queue) {
+    if (queue.missing == null) {
+      return const EmptyState(
+        icon: Icons.check_circle_outline,
+        title: 'Semua data produk sudah lengkap.',
+        text: 'Terima kasih! Saat ini tidak ada produk aktif yang datanya kosong.',
+      );
+    }
+    return EmptyState(
+      icon: Icons.search,
+      title: 'Tidak ada produk yang cocok.',
+      text: 'Tidak ada produk yang kekurangan data jenis ini. Coba jenis data lain.',
+      actionLabel: 'Bersihkan filter',
+      onAction: () => _show(sort: queue.sort),
     );
   }
 }

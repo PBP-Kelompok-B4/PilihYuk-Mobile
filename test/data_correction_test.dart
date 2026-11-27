@@ -54,19 +54,29 @@ Map<String, dynamic> sampleWithoutImages() {
   return json;
 }
 
+/// Bawaannya layar tinggi, supaya semua kartu dan tombol halaman langsung dibangun ListView.
+/// size dan textScale untuk memeriksa layar sempit dengan huruf besar.
 Future<FakeRequest> pumpPage(
   WidgetTester tester,
-  Object? Function() reply,
-) async {
-  // Layar tinggi, supaya semua kartu dan tombol halaman langsung dibangun ListView.
-  tester.view.physicalSize = const Size(1000, 6000);
+  Object? Function() reply, {
+  Size size = const Size(1000, 6000),
+  double textScale = 1,
+}) async {
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   final request = FakeRequest(reply);
   await tester.pumpWidget(
     Provider<CookieRequest>.value(
       value: request,
-      child: const MaterialApp(home: DataCorrectionPage()),
+      child: MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: const DataCorrectionPage(),
+      ),
     ),
   );
   await tester.pump();
@@ -291,19 +301,81 @@ void main() {
     testWidgets('shows the empty state without a filter', (tester) async {
       await pumpPage(tester, () => emptySample(null));
       expect(find.text('Semua data produk sudah lengkap.'), findsOneWidget);
+      expect(
+        find.text(
+          'Terima kasih! Saat ini tidak ada produk aktif yang datanya kosong.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Bersihkan filter'), findsNothing);
       expect(find.textContaining('Halaman'), findsNothing);
     });
 
     testWidgets('shows the empty state for a filter', (tester) async {
       await pumpPage(tester, () => emptySample('nova'));
+      expect(find.text('Tidak ada produk yang cocok.'), findsOneWidget);
       expect(
-        find.text('Tidak ada produk yang kekurangan data jenis ini.'),
+        find.text(
+          'Tidak ada produk yang kekurangan data jenis ini. Coba jenis data lain.',
+        ),
         findsOneWidget,
       );
+      expect(find.text('Bersihkan filter'), findsOneWidget);
       expect(
         find.widgetWithText(ChoiceChip, 'Semua'),
         findsOneWidget,
-      ); // filter masih bisa dihapus
+      ); // filter masih bisa dihapus lewat chip
+    });
+
+    testWidgets(
+      'Bersihkan filter reloads without the filter and keeps the sort',
+      (tester) async {
+        var calls = 0;
+        final request = await pumpPage(tester, () {
+          calls++;
+          return calls == 1
+              ? (emptySample('nova')..['sort'] = 'terbaru')
+              : sampleWithoutImages();
+        });
+
+        await tester.tap(find.text('Bersihkan filter'));
+        await tester.pump();
+        await tester.pump();
+        expect(request.urls, [
+          '$baseUrl/api/v1/corrections/queue/',
+          '$baseUrl/api/v1/corrections/queue/?sort=terbaru',
+        ]);
+        expect(find.text('Bersihkan filter'), findsNothing);
+        expect(find.text('BLUE BAND CAKE & COOKIE'), findsOneWidget);
+      },
+    );
+
+    testWidgets('fits a 360 dp screen with large text', (tester) async {
+      // Nama, merek, dan isi panjang supaya kartu produk terisi penuh.
+      Map<String, dynamic> longNames() {
+        final json = sampleWithoutImages();
+        json['results'][0]
+          ..['product_name'] = 'Biskuit Gandum Utuh Rasa Cokelat Kacang Almond Ekstra Renyah Kemasan Keluarga'
+          ..['brand'] = 'Merek Biskuit Nusantara Sejahtera'
+          ..['quantity'] = '1,25 kg';
+        return json;
+      }
+
+      var calls = 0;
+      await pumpPage(
+        tester,
+        () => ++calls == 1 ? longNames() : emptySample('nova'),
+        size: const Size(360, 3000),
+        textScale: 1.3,
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Halaman 1 dari 18'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'NOVA'));
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Bersihkan filter'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
   });
 }

@@ -67,9 +67,7 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
     setState(() {
       _withdrawing = false;
     });
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(outcome.message)));
+    showToast(context, outcome.message, success: outcome.success);
     if (outcome.gone) {
       Navigator.pop(context, true);
     } else if (outcome.reload) {
@@ -98,7 +96,7 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done &&
                 !snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const LoadingView();
             }
             final error = snapshot.error;
             if (error != null) {
@@ -121,43 +119,35 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
     // Sama dengan web: "Nilai saat ini" hanya benar tepat setelah mengajukan.
     final oldLabel = submitted ? 'Nilai saat ini' : 'Nilai saat diajukan';
     return ListView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(CorrectionSizes.inset),
       children: [
         Text(
           'Pengajuan Saya › Pengajuan #${correction.id}',
-          style: const TextStyle(color: CorrectionColors.muted, fontSize: 13),
+          style: CorrectionText.meta,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: CorrectionSizes.gapMd),
         Text(
           submitted ? 'Pengajuan berhasil dikirim' : 'Detail pengajuan',
-          style: const TextStyle(
-            color: CorrectionColors.ink,
-            fontSize: 28,
-            fontWeight: FontWeight.w700,
-          ),
+          style: CorrectionText.pageTitle,
         ),
         if (submitted) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: CorrectionSizes.gapXs),
           const Text(
             'Terima kasih sudah membantu melengkapi data. Kurator akan meninjau setiap usulan.',
-            style: TextStyle(color: CorrectionColors.muted, fontSize: 15),
+            style: CorrectionText.bodyMuted,
           ),
-          const SizedBox(height: 16),
-          const _SuccessToast(),
+          const SizedBox(height: CorrectionSizes.gapMd),
+          const CorrectionToast(message: 'Pengajuan berhasil dikirim'),
         ],
-        const SizedBox(height: 24),
+        const SizedBox(height: CorrectionSizes.gapLg),
         Container(
           padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: CorrectionColors.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: CorrectionColors.border),
-          ),
+          decoration: CorrectionDecorations.card,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Wrap(
-                spacing: 8,
+                spacing: CorrectionSizes.gapXs,
                 runSpacing: 6,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
@@ -167,31 +157,18 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
                   ),
                   Text(
                     'Pengajuan #${correction.id} · diajukan ${formatDate(correction.createdAt)}',
-                    style: const TextStyle(
-                      color: CorrectionColors.muted,
-                      fontSize: 12,
-                    ),
+                    style: CorrectionText.caption,
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: CorrectionSizes.gapSm),
               Text(
                 correction.product.displayName,
-                style: const TextStyle(
-                  color: CorrectionColors.ink,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: CorrectionText.cardTitle,
               ),
               if (correction.product.subtitle.isNotEmpty)
-                Text(
-                  correction.product.subtitle,
-                  style: const TextStyle(
-                    color: CorrectionColors.muted,
-                    fontSize: 13,
-                  ),
-                ),
-              const SizedBox(height: 12),
+                Text(correction.product.subtitle, style: CorrectionText.meta),
+              const SizedBox(height: CorrectionSizes.gapSm),
               for (final item in correction.items)
                 _ItemView(item: item, oldLabel: oldLabel),
               if (correction.status == CorrectionStatus.pending) ...[
@@ -199,7 +176,7 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
                 const PendingNotice(),
               ],
               if (!submitted && correction.isWithdrawable) ...[
-                const SizedBox(height: 16),
+                const SizedBox(height: CorrectionSizes.gapMd),
                 Align(
                   alignment: Alignment.centerLeft,
                   child: WithdrawButton(
@@ -212,50 +189,14 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
           ),
         ),
         if (submitted) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: CorrectionSizes.gapLg),
           FilledButton(
             onPressed: () => backToQueue(context),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              backgroundColor: CorrectionColors.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: CorrectionButtons.primary(),
             child: const Text('Kembali ke Antrean Data'),
           ),
         ],
       ],
-    );
-  }
-}
-
-class _SuccessToast extends StatelessWidget {
-  const _SuccessToast();
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      liveRegion: true,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: CorrectionColors.ink,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.check_circle_outline, size: 22, color: Colors.white),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Pengajuan berhasil dikirim',
-                style: TextStyle(color: Colors.white, fontSize: 15),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -280,16 +221,9 @@ class _ItemView extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  item.label,
-                  style: const TextStyle(
-                    color: CorrectionColors.ink,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                child: Text(item.label, style: CorrectionText.itemTitle),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: CorrectionSizes.gapXs),
               CorrectionStatusChip(
                 status: item.status,
                 label: item.statusLabel,
@@ -301,16 +235,14 @@ class _ItemView extends StatelessWidget {
             label: oldLabel,
             value: old == null
                 ? const UnknownChip()
-                : Text(
-                    old,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
+                : Text(old, style: CorrectionText.value),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: CorrectionSizes.gapXs),
           _DataRow(
             label: 'Usulan nilai',
             value: Text.rich(
               TextSpan(
+                style: CorrectionText.value,
                 children: [
                   TextSpan(
                     text: displayOrUnknown(item.proposedDisplay),
@@ -322,10 +254,7 @@ class _ItemView extends StatelessWidget {
                   if (item.isPending)
                     const TextSpan(
                       text: ' · belum disetujui',
-                      style: TextStyle(
-                        color: CorrectionColors.muted,
-                        fontSize: 12,
-                      ),
+                      style: CorrectionText.caption,
                     ),
                 ],
               ),
@@ -333,13 +262,10 @@ class _ItemView extends StatelessWidget {
             ),
           ),
           if (item.hasNote) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: CorrectionSizes.gapXs),
             Text(
               'Catatan kurator: ${item.reviewNote}',
-              style: const TextStyle(
-                color: CorrectionColors.ink2,
-                fontSize: 13,
-              ),
+              style: CorrectionText.meta.copyWith(color: CorrectionColors.ink2),
             ),
           ],
         ],
@@ -359,13 +285,8 @@ class _DataRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(color: CorrectionColors.muted, fontSize: 13),
-          ),
-        ),
-        const SizedBox(width: 12),
+        Expanded(child: Text(label, style: CorrectionText.meta)),
+        const SizedBox(width: CorrectionSizes.gapSm),
         Flexible(
           child: Align(alignment: Alignment.centerRight, child: value),
         ),

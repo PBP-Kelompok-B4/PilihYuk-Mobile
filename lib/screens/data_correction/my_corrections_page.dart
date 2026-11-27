@@ -81,9 +81,7 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
     setState(() {
       _withdrawing = null;
     });
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(outcome.message)));
+    showToast(context, outcome.message, success: outcome.success);
     if (outcome.reload) {
       await _reload();
     }
@@ -100,7 +98,7 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
           builder: (context, snapshot) {
             final loading = snapshot.connectionState != ConnectionState.done;
             if (loading && !snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const LoadingView();
             }
             final error = snapshot.error;
             if (error != null) {
@@ -119,16 +117,19 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
   }
 
   Widget _listView(CorrectionList list, bool loading) {
+    final previous = list.previousPage;
+    final next = list.nextPage;
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(CorrectionSizes.inset),
       children: [
-        if (loading) const LinearProgressIndicator(),
+        if (loading)
+          const LinearProgressIndicator(color: CorrectionColors.primary),
         const Text(
           'Status koreksi yang kamu ajukan. Pengajuan yang belum ditinjau sama sekali masih bisa ditarik.',
-          style: TextStyle(color: CorrectionColors.muted, fontSize: 15),
+          style: CorrectionText.bodyMuted,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: CorrectionSizes.gapMd),
         if (list.results.isEmpty)
           EmptyState(
             icon: Icons.inbox_outlined,
@@ -148,36 +149,14 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
                   : null,
               withdrawing: _withdrawing == correction.id,
             ),
-          if (list.numPages > 1) _pagination(list),
+          if (list.numPages > 1)
+            PageNav(
+              page: list.page,
+              numPages: list.numPages,
+              onPrevious: previous == null ? null : () => _go(previous),
+              onNext: next == null ? null : () => _go(next),
+            ),
         ],
-      ],
-    );
-  }
-
-  Widget _pagination(CorrectionList list) {
-    final previous = list.previousPage;
-    final next = list.nextPage;
-    return Row(
-      children: [
-        TextButton.icon(
-          onPressed: previous == null ? null : () => _go(previous),
-          icon: const Icon(Icons.chevron_left),
-          label: const Text('Sebelumnya'),
-        ),
-        Expanded(
-          child: Text(
-            'Halaman ${list.page} dari ${list.numPages}',
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: CorrectionColors.muted, fontSize: 13),
-          ),
-        ),
-        TextButton(
-          onPressed: next == null ? null : () => _go(next),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [Text('Berikutnya'), Icon(Icons.chevron_right)],
-          ),
-        ),
       ],
     );
   }
@@ -201,66 +180,40 @@ class _CorrectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: CorrectionSizes.gapMd),
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: CorrectionColors.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: CorrectionColors.border),
-      ),
+      decoration: CorrectionDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          // Chip dan nomor di atas nama, seperti di halaman detail: chip yang panjang turun baris, tidak meluap.
+          Wrap(
+            spacing: CorrectionSizes.gapXs,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      correction.product.displayName,
-                      style: const TextStyle(
-                        color: CorrectionColors.ink,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Pengajuan #${correction.id} · diajukan ${formatDate(correction.createdAt)}',
-                      style: const TextStyle(
-                        color: CorrectionColors.muted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
               CorrectionStatusChip(
                 status: correction.status,
                 label: correction.statusLabel,
               ),
+              Text(
+                'Pengajuan #${correction.id} · diajukan ${formatDate(correction.createdAt)}',
+                style: CorrectionText.caption,
+              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: CorrectionSizes.gapXs),
+          Text(correction.product.displayName, style: CorrectionText.cardTitle),
+          const SizedBox(height: CorrectionSizes.gapXs),
           for (final item in correction.items) _ItemRow(item: item),
-          const SizedBox(height: 12),
+          const SizedBox(height: CorrectionSizes.gapSm),
           Wrap(
-            spacing: 12,
-            runSpacing: 8,
+            spacing: CorrectionSizes.gapSm,
+            runSpacing: CorrectionSizes.gapXs,
             children: [
               OutlinedButton(
                 onPressed: onOpen,
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, 44),
-                  foregroundColor: CorrectionColors.ink,
-                  side: const BorderSide(color: CorrectionColors.border),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
+                style: CorrectionButtons.outlined(),
                 child: const Text('Lihat detail'),
               ),
               if (correction.isWithdrawable)
@@ -291,17 +244,8 @@ class _ItemRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  item.label,
-                  style: const TextStyle(
-                    color: CorrectionColors.ink,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
+              Expanded(child: Text(item.label, style: CorrectionText.label)),
+              const SizedBox(width: CorrectionSizes.gapXs),
               CorrectionStatusChip(
                 status: item.status,
                 label: item.statusLabel,
@@ -311,10 +255,7 @@ class _ItemRow extends StatelessWidget {
           const SizedBox(height: 4),
           Text.rich(
             TextSpan(
-              style: const TextStyle(
-                color: CorrectionColors.muted,
-                fontSize: 14,
-              ),
+              style: CorrectionText.meta,
               children: [
                 TextSpan(text: '${displayOrUnknown(item.oldDisplay)} → '),
                 TextSpan(
@@ -331,9 +272,8 @@ class _ItemRow extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               'Catatan kurator: ${item.reviewNote}',
-              style: const TextStyle(
+              style: CorrectionText.caption.copyWith(
                 color: CorrectionColors.ink2,
-                fontSize: 12,
               ),
             ),
           ],

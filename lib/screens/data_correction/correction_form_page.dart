@@ -173,7 +173,7 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
     }
   }
 
-  /// 400: pesan per baris + kotak galat; 403: kotak galat; selain itu SnackBar (Coba lagi bila jaringan/server).
+  /// 400: pesan per baris + kotak galat; 403: kotak galat; selain itu toast (Coba lagi bila jaringan/server).
   void _showError(ApiError error) {
     if (error.status == 403) {
       setState(() {
@@ -198,16 +198,14 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
       return;
     }
     final retry = error.isNetwork || error.status >= 500;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(error.message),
-          action: retry
-              ? SnackBarAction(label: 'Coba lagi', onPressed: _submit)
-              : null,
-        ),
-      );
+    showToast(
+      context,
+      error.message,
+      success: false,
+      action: retry
+          ? SnackBarAction(label: 'Coba lagi', onPressed: _submit)
+          : null,
+    );
   }
 
   String? _validate(CorrectionField? field, String? text) {
@@ -229,7 +227,7 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
         future: _form,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
+            return const LoadingView();
           }
           final error = snapshot.error;
           if (error != null) {
@@ -252,34 +250,23 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
     return Form(
       key: _formKey,
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(CorrectionSizes.inset),
         children: [
           const Text(
             'Antrean Data › Lengkapi Data',
-            style: TextStyle(color: CorrectionColors.muted, fontSize: 13),
+            style: CorrectionText.meta,
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Lengkapi Data',
-            style: TextStyle(
-              color: CorrectionColors.ink,
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: CorrectionSizes.gapMd),
+          const Text('Lengkapi Data', style: CorrectionText.pageTitle),
+          const SizedBox(height: CorrectionSizes.gapXs),
           const Text(
             'Ajukan koreksi data produk.',
-            style: TextStyle(color: CorrectionColors.muted, fontSize: 15),
+            style: CorrectionText.bodyMuted,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: CorrectionSizes.gapLg),
           Container(
             padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: CorrectionColors.surface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: CorrectionColors.border),
-            ),
+            decoration: CorrectionDecorations.card,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -290,14 +277,15 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
                       data.product.displayName,
                       data.product.subtitle,
                     ].where((part) => part.isNotEmpty).join(' · '),
+                    style: CorrectionText.body,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: CorrectionSizes.gapMd),
                 const Text(
                   'Pilih field yang ingin dikoreksi, lalu isi Usulan nilai. Tambahkan baris untuk field lain.',
-                  style: TextStyle(color: CorrectionColors.muted, fontSize: 13),
+                  style: CorrectionText.meta,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: CorrectionSizes.gapSm),
                 for (var i = 0; i < _rows.length; i++)
                   _rowView(data, _rows[i], i, used),
                 Align(
@@ -306,29 +294,26 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
                     onPressed: used.length >= data.fields.length
                         ? null
                         : _addRow,
+                    style: TextButton.styleFrom(
+                      foregroundColor: CorrectionColors.primary,
+                      minimumSize: const Size(0, CorrectionSizes.touchTarget),
+                    ),
                     child: const Text('+ Tambah field lain'),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: CorrectionSizes.gapSm),
                 const PendingNotice(),
               ],
             ),
           ),
-          if (_alert != null) ...[const SizedBox(height: 16), _Alert(_alert!)],
-          const SizedBox(height: 24),
+          if (_alert case final alert?) ...[
+            const SizedBox(height: CorrectionSizes.gapMd),
+            _Alert(alert),
+          ],
+          const SizedBox(height: CorrectionSizes.gapLg),
           FilledButton(
             onPressed: _sending ? null : _submit,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              backgroundColor: CorrectionColors.primary,
-              disabledBackgroundColor: CorrectionColors.primary.withValues(
-                alpha: 0.45,
-              ),
-              disabledForegroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: CorrectionButtons.primary(),
             child: _sending
                 ? const Row(
                     mainAxisSize: MainAxisSize.min,
@@ -346,10 +331,13 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
                   )
                 : const Text('Ajukan Koreksi'),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: CorrectionSizes.gapXs),
           TextButton(
             onPressed: _sending ? null : () => Navigator.maybePop(context),
-            style: TextButton.styleFrom(minimumSize: const Size.fromHeight(44)),
+            style: TextButton.styleFrom(
+              foregroundColor: CorrectionColors.ink,
+              minimumSize: const Size.fromHeight(CorrectionSizes.touchTarget),
+            ),
             child: const Text('Batal'),
           ),
         ],
@@ -366,11 +354,11 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
     final field = row.field == null ? null : data.field(row.field!);
     return Container(
       key: ValueKey('correction-row-$index'),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: CorrectionSizes.gapSm),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         border: Border.all(color: CorrectionColors.border),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: CorrectionSizes.controlRadius,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -391,7 +379,7 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
             initialValue: row.field,
             isExpanded: true,
             hint: const Text('Pilih field…'),
-            decoration: _decoration(),
+            decoration: CorrectionInputs.decoration(),
             items: [
               for (final option in data.fields)
                 DropdownMenuItem(
@@ -399,7 +387,12 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
                   enabled:
                       option.fieldName == row.field ||
                       !used.contains(option.fieldName),
-                  child: Text(option.label),
+                  // Satu baris: label panjang dipotong "…" di layar sempit atau huruf besar.
+                  child: Text(
+                    option.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
             ],
             onChanged: (value) {
@@ -408,7 +401,7 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
               });
             },
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: CorrectionSizes.gapSm),
           const _Label('Nilai saat ini'),
           if (field == null)
             const _ReadOnlyBox(child: Text('—'))
@@ -418,16 +411,16 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
             _ReadOnlyBox(
               child: Text(
                 displayOrUnknown(field.currentDisplay),
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: CorrectionText.value,
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: CorrectionSizes.gapSm),
           const _Label('Usulan nilai'),
           TextFormField(
             controller: row.controller,
             enabled: field != null,
             keyboardType: _keyboard(field),
-            decoration: _decoration(
+            decoration: CorrectionInputs.decoration(
               hint: field == null ? 'Pilih field dulu' : null,
               helper: field?.helpText,
             ),
@@ -449,29 +442,6 @@ TextInputType _keyboard(CorrectionField? field) {
   return TextInputType.text;
 }
 
-InputDecoration _decoration({String? hint, String? helper}) {
-  OutlineInputBorder border(Color color, [double width = 1]) =>
-      OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: color, width: width),
-      );
-  return InputDecoration(
-    hintText: hint,
-    helperText: helper,
-    helperMaxLines: 3,
-    errorMaxLines: 3,
-    isDense: true,
-    filled: true,
-    fillColor: CorrectionColors.surface,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-    enabledBorder: border(CorrectionColors.strong),
-    disabledBorder: border(CorrectionColors.border),
-    focusedBorder: border(CorrectionColors.primary, 1.5),
-    errorBorder: border(CorrectionColors.error),
-    focusedErrorBorder: border(CorrectionColors.error, 1.5),
-  );
-}
-
 class _Label extends StatelessWidget {
   const _Label(this.text);
 
@@ -481,14 +451,7 @@ class _Label extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: CorrectionColors.ink,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      child: Text(text, style: CorrectionText.label),
     );
   }
 }
@@ -502,10 +465,7 @@ class _ReadOnlyBox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: CorrectionColors.secondary,
-        borderRadius: BorderRadius.circular(10),
-      ),
+      decoration: CorrectionDecorations.field,
       child: child,
     );
   }
@@ -522,9 +482,9 @@ class _Alert extends StatelessWidget {
       liveRegion: true,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: CorrectionColors.errorSoft,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: CorrectionSizes.controlRadius,
         ),
         child: Text(
           message,

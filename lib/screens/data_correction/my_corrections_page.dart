@@ -4,10 +4,12 @@ import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_detail_page.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_form_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 
 /// Pengajuan Saya: koreksi milik pengguna yang sedang masuk (GET mine/?page=), terbaru dulu, 10 per halaman.
-/// Isinya sama dengan /antrean/saya/ di web. Setelah menarik pengajuan, halaman dimuat ulang dari server.
+/// Isinya sama dengan /antrean/saya/ di web. Setelah mengubah atau menarik pengajuan, halaman dimuat ulang
+/// dari server.
 class MyCorrectionsPage extends StatefulWidget {
   const MyCorrectionsPage({super.key});
 
@@ -56,6 +58,18 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
       ),
     );
     if (changed == true && mounted) {
+      await _reload();
+    }
+  }
+
+  /// Form ubah mengembalikan Correction baru (200) atau true (404/409); keduanya memuat ulang daftar.
+  /// null (Batal) tidak mengubah apa pun.
+  Future<void> _edit(Correction correction) async {
+    final result = await Navigator.push<Object?>(
+      context,
+      MaterialPageRoute(builder: (_) => CorrectionFormPage.edit(correction)),
+    );
+    if (result != null && mounted) {
       await _reload();
     }
   }
@@ -144,6 +158,7 @@ class _MyCorrectionsPageState extends State<MyCorrectionsPage> {
               key: ValueKey('correction-${correction.id}'),
               correction: correction,
               onOpen: () => _openDetail(correction),
+              onEdit: _withdrawing == null ? () => _edit(correction) : null,
               onWithdraw: _withdrawing == null
                   ? () => _withdraw(correction)
                   : null,
@@ -167,14 +182,17 @@ class _CorrectionCard extends StatelessWidget {
     super.key,
     required this.correction,
     required this.onOpen,
+    required this.onEdit,
     required this.onWithdraw,
     this.withdrawing = false,
   });
 
   final Correction correction;
   final VoidCallback onOpen;
-  final VoidCallback?
-  onWithdraw; // null selama ada pengajuan lain yang sedang ditarik
+
+  // onEdit dan onWithdraw null selama ada pengajuan lain yang sedang ditarik.
+  final VoidCallback? onEdit;
+  final VoidCallback? onWithdraw;
   final bool withdrawing;
 
   @override
@@ -216,8 +234,15 @@ class _CorrectionCard extends StatelessWidget {
                 style: CorrectionButtons.outlined(),
                 child: const Text('Lihat detail'),
               ),
-              if (correction.isWithdrawable)
+              // Ubah dan tarik memakai aturan yang sama: semua item masih pending (is_withdrawable).
+              if (correction.isWithdrawable) ...[
+                OutlinedButton(
+                  onPressed: onEdit,
+                  style: CorrectionButtons.outlined(),
+                  child: const Text('Ubah usulan'),
+                ),
                 WithdrawButton(onPressed: onWithdraw, busy: withdrawing),
+              ],
             ],
           ),
         ],

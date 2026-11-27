@@ -3,12 +3,14 @@ import 'package:pbp_django_auth/pbp_django_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:pilihyuk_mobile/models/data_correction.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_api.dart';
+import 'package:pilihyuk_mobile/screens/data_correction/correction_form_page.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/correction_widgets.dart';
 import 'package:pilihyuk_mobile/screens/data_correction/module_navigation.dart';
 
 /// Detail satu pengajuan milik sendiri. initial dipakai apa adanya (mis. balasan 201); tanpa initial,
 /// data dimuat dari GET mine/{id}/. justSubmitted menampilkan keadaan "Pengajuan berhasil dikirim".
-/// Ditutup dengan hasil true bila pengajuan berubah (ditarik atau ternyata sudah ditinjau), supaya daftar dimuat ulang.
+/// Ditutup dengan hasil true bila pengajuan berubah (ditarik, diubah, atau ternyata sudah ditinjau),
+/// supaya daftar dimuat ulang.
 class CorrectionDetailPage extends StatefulWidget {
   const CorrectionDetailPage({
     super.key,
@@ -76,6 +78,22 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
         _correction = _load();
       });
     }
+  }
+
+  /// Hasil form ubah: Correction baru (200) langsung ditampilkan tanpa GET; true (404/409) dimuat ulang;
+  /// null (Batal) tidak mengubah apa pun.
+  Future<void> _edit(Correction correction) async {
+    final result = await Navigator.push<Object?>(
+      context,
+      MaterialPageRoute(builder: (_) => CorrectionFormPage.edit(correction)),
+    );
+    if (!mounted || result == null) {
+      return;
+    }
+    setState(() {
+      _changed = true;
+      _correction = result is Correction ? Future.value(result) : _load();
+    });
   }
 
   @override
@@ -175,14 +193,23 @@ class _CorrectionDetailPageState extends State<CorrectionDetailPage> {
                 const SizedBox(height: 4),
                 const PendingNotice(),
               ],
+              // Ubah dan tarik memakai aturan yang sama: semua item masih pending (is_withdrawable).
               if (!submitted && correction.isWithdrawable) ...[
                 const SizedBox(height: CorrectionSizes.gapMd),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: WithdrawButton(
-                    onPressed: () => _withdraw(correction),
-                    busy: _withdrawing,
-                  ),
+                Wrap(
+                  spacing: CorrectionSizes.gapSm,
+                  runSpacing: CorrectionSizes.gapXs,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _withdrawing ? null : () => _edit(correction),
+                      style: CorrectionButtons.outlined(),
+                      child: const Text('Ubah usulan'),
+                    ),
+                    WithdrawButton(
+                      onPressed: () => _withdraw(correction),
+                      busy: _withdrawing,
+                    ),
+                  ],
                 ),
               ],
             ],

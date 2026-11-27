@@ -23,7 +23,7 @@ Future<({int status, dynamic data})> getJson(
 
 /// Penghubung CorrectionApi dengan halaman antrean yang sedang terbuka, satu per CookieRequest. Antrean ada di
 /// bawah semua halaman modul, jadi ia yang menampilkan sheet login saat sesi habis. changed menandai tulis
-/// yang berhasil (kirim, tarik, tinjau), supaya antrean dimuat ulang saat pengguna kembali.
+/// yang berhasil (kirim, ubah, tarik, tinjau), supaya antrean dimuat ulang saat pengguna kembali.
 class ModuleSession {
   ModuleSession(this._onSessionEnded);
 
@@ -79,11 +79,19 @@ class CorrectionApi {
   Future<Correction> submit(int productId, Map<String, String> values) =>
       _write('POST', _uri('mine/'), Correction.fromJson, {
         'product': productId,
-        'items': [
-          for (final entry in values.entries)
-            {'field_name': entry.key, 'proposed_value': entry.value},
-        ],
+        'items': _items(values),
       });
+
+  /// PATCH mine/{id}/. values sama bentuknya dengan submit dan menjadi daftar LENGKAP usulan yang baru:
+  /// field yang tidak ada ikut dihapus. Hasil: pengajuan yang sama berisi item baru. Ada item yang sudah
+  /// ditinjau -> ApiError 409 not_editable.
+  /// Contoh: update(12, {"fiber_100g": "8"}) -> body {"items": [{"field_name": "fiber_100g", ...}]}
+  Future<Correction> update(int id, Map<String, String> values) => _write(
+    'PATCH',
+    _uri('mine/$id/'),
+    Correction.fromJson,
+    {'items': _items(values)},
+  );
 
   Future<CorrectionList> mine({int page = 1}) => _get(
     _uri('mine/', {if (page > 1) 'page': '$page'}),
@@ -134,6 +142,13 @@ class CorrectionApi {
   static Uri _uri(String path, [Map<String, Object> query = const {}]) =>
       Uri.parse('$baseUrl/api/v1/corrections/$path')
           .replace(queryParameters: query.isEmpty ? null : query);
+
+  /// Isi "items" untuk POST dan PATCH, urutannya tetap.
+  /// Contoh: {"fiber_100g": "7,5"} -> [{"field_name": "fiber_100g", "proposed_value": "7,5"}]
+  static List<Map<String, String>> _items(Map<String, String> values) => [
+    for (final entry in values.entries)
+      {'field_name': entry.key, 'proposed_value': entry.value},
+  ];
 
   Future<T> _get<T>(Uri uri, T Function(Map<String, dynamic>) parse) => _call(
     () => getJson(request, uri.toString()),
